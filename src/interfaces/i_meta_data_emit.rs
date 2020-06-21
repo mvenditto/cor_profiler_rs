@@ -33,7 +33,7 @@ pub struct COR_SECATTR {
 }
 
 #[com_interface("F5DD9950-F693-42e6-830E-7B833E8146A9")]
-pub trait IMetaDataEmit:  IUnknown {
+pub trait IMetaDataEmit: IUnknown {
     unsafe fn set_module_props(&self, sz_name: LPCWSTR) -> HRESULT;
     unsafe fn save(&self, sz_file: LPCWSTR, dw_save_flags: DWORD) -> HRESULT;
     unsafe fn save_to_stream(&self, p_istream: *mut dyn IStream, dw_save_flags: DWORD) -> HRESULT;
