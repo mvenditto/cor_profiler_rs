@@ -50,6 +50,12 @@ impl<'a> ILInstr {
             return get_opcode(self.instr);
         }
     }
+
+    pub(crate) fn set_arg_32(&self, arg: INT32) {
+        unsafe {
+            set_arg_32(self.instr, arg);
+        }
+    }
 }
 
 impl PartialEq for ILInstr {
@@ -57,6 +63,22 @@ impl PartialEq for ILInstr {
         ptr::eq(self.instr,other.instr)
     }
 }
+
+impl Clone for ILInstr {
+    fn clone_from(&mut self, source: &Self) {
+        self.instr = source.instr;
+    }
+
+    fn clone(&self) -> Self {
+        ILInstr { instr: self.instr }
+    }
+}
+
+impl Copy for ILInstr {
+    
+}
+
+
 
 impl Eq for ILInstr {}
 
@@ -117,6 +139,15 @@ impl ILRewriter {
         }
         unsafe { return import(self.rewriter); }
     }
+
+    pub(crate) fn export(&self) -> HRESULT {
+        assert!(self.rewriter.is_null() == false);
+        unsafe { return emit(self.rewriter); }
+    }
+
+    pub(crate) fn get_il_list(&self) -> ILInstr {
+        unsafe { ILInstr { instr: get_il_list(self.rewriter) } }
+    }
 }
 
 impl Drop for ILRewriter {
@@ -157,6 +188,8 @@ extern {
     pub fn get_opcode(instr: C_ILInstr) -> UINT;
 
     pub fn set_opcode(instr: C_ILInstr, opcode: UINT);
+
+    pub fn set_arg_32(instr: C_ILInstr, arg: INT32);
 
     pub fn get_next(instr: C_ILInstr) -> C_ILInstr;
 }

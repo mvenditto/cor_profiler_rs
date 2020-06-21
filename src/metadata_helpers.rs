@@ -7,7 +7,7 @@ use crate::interfaces::{
     ICorProfilerInfo2,
     ICorProfilerInfo10,
     IMetaDataImport,
-    IMetaDataEmit2
+    IMetaDataEmit
 };
 
 use com::{
@@ -26,7 +26,10 @@ use widestring::{
     U16CString
 };
 
-use crate::guids::IID_IMetaDataImport;
+use crate::guids::{
+    IID_IMetaDataImport,
+    IID_IMetaDataEmit
+};
 
 macro_rules! is_fail {
     ($x:expr) => {
@@ -90,8 +93,41 @@ pub unsafe fn il_test(info: & ComPtr<dyn ICorProfilerInfo10>, module_id: ModuleI
 
 }
 
-pub fn new_user_local(emit: & ComPtr<dyn IMetaDataEmit2>) -> mdString {
-    return 0 as mdString;
+pub fn new_user_string(info: & ComPtr<dyn ICorProfilerInfo2>, module_id: ModuleID, string: String) -> Result<mdString, HRESULT> {
+    let mut token: mdString = 0;
+    let size = string.len();
+    let user_str_value = U16String::from(string).as_ptr() as LPCWSTR;
+
+    unsafe {
+        let mut unkn: *mut c_void = ptr::null_mut();
+        
+        let mut hr = info.get_module_meta_data(
+            module_id,
+            CorOpenFlags::ofRead as u32,
+            &IID_IMetaDataEmit,
+            (&mut unkn) as *mut _ as *mut *mut c_void
+        );
+
+        if is_fail!(hr) {
+            error!("get_module_meta_data failed with hr=0x{:x}", hr);
+            return Err(hr);
+        }
+
+        let md_emit = ComPtr::<dyn IMetaDataEmit>::new(unkn as *mut _).upgrade();
+
+        hr = md_emit.define_user_string(
+            user_str_value,
+            size as ULONG,
+            &mut token
+        );
+
+        if is_fail!(hr) {
+            error!("define_user_string failed with hr=0x{:x}", hr);
+            return Err(hr);
+        }
+    }
+
+    Ok(token)
 } 
 
 pub fn get_function_info(info: & ComPtr<dyn ICorProfilerInfo2>, function_id: FunctionID) -> Result<FunctionInfo, HRESULT> {

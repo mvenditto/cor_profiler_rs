@@ -1,11 +1,15 @@
 use crate::types::*;
 use crate::interfaces::*;
 use crate::il_rewriter::*;
+use crate::opcodes::{
+    CEE_LDSTR
+};
 use crate::metadata_helpers::{
     get_function_fully_qualified_name,
     get_module_name,
     get_function_info,
-    il_test
+    il_test,
+    new_user_string
 };
 
 use std::cell::RefCell;
@@ -54,7 +58,7 @@ fn function_seen(info: & ComPtr<dyn ICorProfilerInfo10>, function_id: FunctionID
             match get_module_name(&info2, i.module_id) {
                 Err(hr) => return hr,
                 Ok(module_name) => {
-                    if module_name.ends_with("test.dll") && i.function_name == "TestMethod" {
+                    if module_name.ends_with("test.dll") && i.function_name == "Main" {
                         
                         info!("request re_jit_with_inliners for {}", i.function_name);
                         
@@ -179,27 +183,60 @@ impl ICorProfilerCallback4 for CorProfiler {
         let info_borrow = self.prof_info.borrow();
         let info = info_borrow.as_ref().unwrap();
         let info1 = info.get_interface::<dyn ICorProfilerInfo>().unwrap();
+        let info2 = info.get_interface::<dyn ICorProfilerInfo2>().unwrap();
         
         il_test(info, module_id, method_id);
         
-        let rewriter = ILRewriter::new(
+        let mut rewriter = ILRewriter::new(
             (info1.as_raw()) as *mut *mut dyn ICorProfilerInfo,
             function_control,
             module_id,
             method_id
         );
 
-        let hr = rewriter.import();
+        info!("Created IL Rewriter!");
+
+        let mut hr = rewriter.import();
 
         if hr < 0 {
             error!("import failed with hr=0x{:x}", hr);
         }
 
-        for instr in rewriter {
-            info!("0x{:x}", instr.opcode());
-        }
+        let new_string = new_user_string(
+            &info2, 
+            module_id, 
+            String::from("Test!")
+        );
 
-        info!("Created IL Rewriter!");
+        match new_string {
+            Err(hr) => {
+                error!("cannot define user string hr=0x{:x}", hr)
+            },
+            Ok(token) => {
+                let head_instr = rewriter.get_il_list();
+                let mut instr = head_instr;
+                loop {
+                    if instr.opcode() == CEE_LDSTR {
+                        info!("found ldstr");
+                        instr.set_arg_32(token);
+                    }
+                    info!("0x{:x}", instr.opcode());
+                    
+                    match instr.get_next() {
+                        Some(next) => instr = next,
+                        _ => {}
+                    }
+                    
+                    if instr == head_instr { break }
+                }
+
+                hr = rewriter.export();
+
+                if hr < 0 {
+                    error!("export failed with hr=0x{:x}", hr);
+                }
+            }
+        }
 
         S_OK 
     }
