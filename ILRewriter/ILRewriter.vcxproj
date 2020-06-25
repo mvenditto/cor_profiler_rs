@@ -128,6 +128,10 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
+    <PostBuildEvent>
+      <Command>copy /Y "$(TargetDir)$(ProjectName).lib" "$(SolutionDir)..\cor_profiler\$(ProjectName).lib"
+copy /Y "$(TargetDir)$(ProjectName).dll" "$(SolutionDir)..\cor_profiler\target\debug\$(ProjectName).dll"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="ilrewriter.h" />
