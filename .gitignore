@@ -1,0 +1,5 @@
+cor_profiler/target
+cor_profiler/Cargo.lock
+cor_profiler/*.lib
+ILRewriter/ILRewriter.vcxproj.user
+/.vscode
