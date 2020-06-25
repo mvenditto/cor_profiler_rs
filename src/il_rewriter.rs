@@ -1,3 +1,4 @@
+#[macro_use] 
 use crate::types::*;
 
 use crate::interfaces::{
@@ -25,12 +26,22 @@ pub struct ILRewriter {
     head_instr: C_ILInstr
 }
 
+pub(crate) enum ILInstrArgValue {
+    Int8(INT8),
+    Int16(INT16),
+    Int32(INT32),
+    Int64(INT64),
+    Instr(ILInstr)
+}
+
 pub struct ILInstr {
-    instr: C_ILInstr
+    instr: C_ILInstr,
 }
 
 impl<'a> ILInstr {
-
+    pub(crate) fn new() -> ILInstr {
+        unsafe { ILInstr {instr: new_il_instruction()} }
+    }
 
     pub(crate) fn get_next(&self) -> Option<ILInstr> {
         unsafe {
@@ -51,9 +62,51 @@ impl<'a> ILInstr {
         }
     }
 
+    pub(crate) fn set_opcode(&mut self, opcode: UINT) {
+        unsafe {
+            return set_opcode(self.instr, opcode);
+        }
+    }
+
+    pub(crate) fn set_arg(&self, arg: ILInstrArgValue) {
+        unsafe {
+            match arg {
+                ILInstrArgValue::Int8(x) => set_arg_8(self.instr, x),
+                ILInstrArgValue::Int16(x) => set_arg_16(self.instr, x),
+                ILInstrArgValue::Int32(x) => set_arg_32(self.instr, x),
+                ILInstrArgValue::Int64(x) => set_arg_64(self.instr, x),
+                ILInstrArgValue::Instr(x) => set_arg_instr(self.instr, x.instr)
+            }
+        }
+    }
+
+    pub(crate) fn set_arg_8(&self, arg: INT8) {
+        unsafe {
+            set_arg_8(self.instr, arg);
+        }
+    }
+
+    pub(crate) fn set_arg_16(&self, arg: INT16) {
+        unsafe {
+            set_arg_16(self.instr, arg);
+        }
+    }
+
     pub(crate) fn set_arg_32(&self, arg: INT32) {
         unsafe {
             set_arg_32(self.instr, arg);
+        }
+    }
+
+    pub(crate) fn set_arg_64(&self, arg: INT64) {
+        unsafe {
+            set_arg_64(self.instr, arg);
+        }
+    }
+
+    pub(crate) fn set_arg_instr(&self, arg: ILInstr) {
+        unsafe {
+            set_arg_instr(self.instr, arg.instr);
         }
     }
 }
@@ -77,8 +130,6 @@ impl Clone for ILInstr {
 impl Copy for ILInstr {
     
 }
-
-
 
 impl Eq for ILInstr {}
 
@@ -132,7 +183,7 @@ impl ILRewriter {
             }
         }
     }
-
+    
     pub(crate) fn import(&self) -> HRESULT {
         if self.rewriter.is_null() {
             return E_FAIL;
@@ -147,6 +198,12 @@ impl ILRewriter {
 
     pub(crate) fn get_il_list(&self) -> ILInstr {
         unsafe { ILInstr { instr: get_il_list(self.rewriter) } }
+    }
+
+    pub(crate) fn insert_before(&self, before: ILInstr, what: ILInstr) {
+        unsafe {
+            insert_before(self.rewriter, before.instr, what.instr);
+        }
     }
 }
 
@@ -177,11 +234,11 @@ extern {
 
     pub fn emit(rewriter: C_ILRewriter) -> HRESULT;
 
-    pub fn new_il_instruction(rewriter: C_ILRewriter) -> C_ILInstr;
+    pub fn new_il_instruction() -> C_ILInstr;
 
-    pub fn insert_before(il_where: C_ILInstr, il_what: C_ILInstr);
+    pub fn insert_before(rewriter: C_ILRewriter, il_where: C_ILInstr, il_what: C_ILInstr);
 
-    pub fn insert_after(il_where: C_ILInstr, il_what: C_ILInstr);
+    pub fn insert_after(rewriter: C_ILRewriter, il_where: C_ILInstr, il_what: C_ILInstr);
 
     pub fn get_il_list(rewriter: C_ILRewriter) -> C_ILInstr;
 
@@ -189,7 +246,15 @@ extern {
 
     pub fn set_opcode(instr: C_ILInstr, opcode: UINT);
 
+    pub fn set_arg_64(instr: C_ILInstr, arg: INT64);
+
     pub fn set_arg_32(instr: C_ILInstr, arg: INT32);
+
+    pub fn set_arg_16(instr: C_ILInstr, arg: INT16);
+
+    pub fn set_arg_8(instr: C_ILInstr, arg: INT8);
+
+    pub fn set_arg_instr(instr: C_ILInstr, arg: C_ILInstr);
 
     pub fn get_next(instr: C_ILInstr) -> C_ILInstr;
 }

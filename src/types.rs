@@ -101,16 +101,16 @@ pub struct OSINFO {
 
 #[repr(C)]
 pub struct ASSEMBLYMETADATA {
-    usMajorVersion: USHORT,
-    usMinorVersion: USHORT,
-    usBuildNumber: USHORT,
-    usRevisionNumber: USHORT,
-    szLocale: LPWSTR,
-    cbLocale: ULONG,
-    rProcessor: *mut DWORD,
-    ulProcessor: ULONG,
-    rOS: *mut OSINFO,
-    ulOS: ULONG,
+    pub usMajorVersion: USHORT,
+    pub usMinorVersion: USHORT,
+    pub usBuildNumber: USHORT,
+    pub usRevisionNumber: USHORT,
+    pub szLocale: LPWSTR,
+    pub cbLocale: ULONG,
+    pub rProcessor: *mut DWORD,
+    pub ulProcessor: ULONG,
+    pub rOS: *mut OSINFO,
+    pub ulOS: ULONG,
 }
 
 #[repr(C)]
