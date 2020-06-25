@@ -1,4 +1,4 @@
 /target
 Cargo.lock
-ILRewriter.lib
+*.lib
 /.vscode
