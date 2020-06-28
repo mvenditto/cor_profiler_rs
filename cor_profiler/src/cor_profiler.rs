@@ -11,8 +11,10 @@ use crate::metadata_helpers::{
     get_meta_data_interface,
     get_module_name,
     get_function_info,
+    define_assembly_reference,
     il_test,
-    new_user_string
+    new_user_string,
+    AssemblyInfo
 };
 
 use std::{
@@ -171,6 +173,7 @@ impl ICorProfilerCallback for CorProfiler {
 
         info!("module_load_finished: {}", module_name);
 
+        /*
         let mut assembly_ref: mdAssemblyRef = 0;
 
         let public_token: &[BYTE] = &[0xf3, 0x3c, 0xbf, 0xca, 0x3a, 0x74, 0xa3, 0xba];
@@ -209,6 +212,27 @@ impl ICorProfilerCallback for CorProfiler {
         if hr < 0 {
             error!("define_assembly_ref failed with hr=0x{:x}", hr);
             return hr;
+        }*/
+
+        let mut hr: HRESULT = S_OK;
+
+        let maybe_assembly_ref = define_assembly_reference(
+            &assembly_emit,
+            &[0xf3, 0x3c, 0xbf, 0xca, 0x3a, 0x74, 0xa3, 0xba],
+            "helpers",
+            "neutral",
+            "1.0.0.0"
+        );
+
+        let mut assembly_ref: mdAssemblyRef = 0;
+        match maybe_assembly_ref {
+            Ok(assembly_reference) => {
+                assembly_ref = assembly_reference;
+            },
+            Err(hr) => {
+                error!("define_assembly_ref failed with hr=0x{:x}", hr);
+                return hr;
+            }
         }
 
         info!("pushed helpers.dll ref to test.dll");

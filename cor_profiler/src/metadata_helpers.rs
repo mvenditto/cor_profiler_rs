@@ -7,7 +7,8 @@ use crate::interfaces::{
     ICorProfilerInfo2,
     ICorProfilerInfo10,
     IMetaDataImport,
-    IMetaDataEmit
+    IMetaDataEmit,
+    IMetaDataAssemblyEmit
 };
 
 use com::{
@@ -18,8 +19,12 @@ use com::{
 };
 
 use std::{
-    ffi::c_void,
-    ptr
+    ptr,
+    ffi::{
+        c_void,
+        OsStr
+    },
+    os::windows::ffi::OsStrExt
 };
 
 extern crate widestring;
@@ -52,11 +57,43 @@ pub struct FunctionFullNameInfo {
     pub function_name: String
 }
 
+pub struct AssemblyInfo<'a> {
+    pub public_token: &'a[BYTE],
+    pub name: &'a str,
+    pub locale: &'a str,
+    pub version: &'a str
+}
+
 impl fmt::Display for FunctionFullNameInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
         write!(f, r#"{}.{}.{}"#, self.module_name, self.class_name, self.function_name)
     }
 }
+
+fn str_to_lpcwstr_1(rust_str: &str) -> LPCWSTR {
+    U16String::from(rust_str.to_owned()).as_ptr() as LPCWSTR
+}
+
+fn str_to_lpcwstr_2(rust_str: &str) -> LPCWSTR {
+    OsStr::new(rust_str)
+        .encode_wide()
+        .chain(Some(0).into_iter())
+        .collect::<Vec<_>>()
+        .as_ptr() as LPCWSTR
+}
+
+fn str_to_lpwstr_1(rust_str: &str) -> LPWSTR {
+    U16String::from(rust_str.to_owned()).as_ptr() as LPWSTR
+}
+
+fn str_to_lpwstr_2(rust_str: &str) -> LPWSTR {
+    OsStr::new(rust_str)
+        .encode_wide()
+        .chain(Some(0).into_iter())
+        .collect::<Vec<_>>()
+        .as_ptr() as LPWSTR
+}
+
 
 pub fn get_meta_data_interface<I: ComInterface + ?Sized>(info: & ComPtr<dyn ICorProfilerInfo10>, module_id: ModuleID) -> Result<ComRc<I>, HRESULT> {
     
@@ -84,6 +121,58 @@ pub fn get_meta_data_interface<I: ComInterface + ?Sized>(info: & ComPtr<dyn ICor
         }
 
         return Ok(ComPtr::<I>::new(unkn as *mut _).upgrade())
+    }
+}
+
+pub fn define_assembly_reference(
+    assembly_emit: & ComRc<dyn IMetaDataAssemblyEmit>,
+    assembly_public_token: &[BYTE],
+    assembly_name: &str,
+    assembly_locale: &str,
+    assembly_version: &str
+) -> Result<mdAssemblyRef, HRESULT> {
+
+    let v: Vec<u16> = assembly_version
+        .split(".")
+        .map(|x| x.parse().expect("cannot parse"))
+        .collect();
+
+    let (major, minor, build, revision) = (v[0], v[1], v[2], v[3]);
+    let locale = str_to_lpwstr_2(assembly_locale);
+    let name = str_to_lpwstr_2(assembly_name);
+    
+    let metadata = ASSEMBLYMETADATA {
+        usMajorVersion: major,
+        usMinorVersion: minor,
+        usBuildNumber: build,
+        usRevisionNumber: revision,
+        szLocale: locale,
+        cbLocale: (assembly_locale.len()-1) as ULONG,
+        rOS: ptr::null_mut(),
+        rProcessor: ptr::null_mut(),
+        ulProcessor: 0,
+        ulOS: 0
+    };
+
+    let mut assembly_ref: mdAssemblyRef = 0;
+
+    unsafe {
+        let hr = assembly_emit.define_assembly_ref(
+            assembly_public_token.as_ptr() as *const c_void,
+            assembly_public_token.len() as ULONG,
+            name,
+            &metadata,
+            ptr::null_mut(),
+            0,
+            0,
+            &mut assembly_ref
+        );
+
+        if is_fail!(hr) {
+            Err(hr)
+        } else {
+            Ok(assembly_ref)
+        }
     }
 }
 
