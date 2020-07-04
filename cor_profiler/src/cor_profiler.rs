@@ -12,9 +12,10 @@ use crate::metadata_helpers::{
     get_module_name,
     get_function_info,
     define_assembly_reference,
+    define_member_ref,
+    define_type_ref,
     il_test,
-    new_user_string,
-    AssemblyInfo
+    new_user_string
 };
 
 use std::{
@@ -154,6 +155,11 @@ impl ICorProfilerCallback for CorProfiler {
     }
 
     unsafe fn module_load_finished(&self, module_id: ModuleID, hr_status: HRESULT) -> HRESULT {
+        
+        if hr_status <= 0 {
+            return hr_status;
+        }
+        
         let info_borrow = self.prof_info.borrow();
         let info = info_borrow.as_ref().unwrap();
         let info2 = info.get_interface::<dyn ICorProfilerInfo2>().unwrap();
@@ -173,49 +179,6 @@ impl ICorProfilerCallback for CorProfiler {
 
         info!("module_load_finished: {}", module_name);
 
-        /*
-        let mut assembly_ref: mdAssemblyRef = 0;
-
-        let public_token: &[BYTE] = &[0xf3, 0x3c, 0xbf, 0xca, 0x3a, 0x74, 0xa3, 0xba];
-        let module_name = "neutral".to_string();
-        let locale_size = module_name.len();
-        let locale = U16String::from(module_name).as_ptr() as LPWSTR;
-        let mut hr = S_OK;
-        
-        let metadata = ASSEMBLYMETADATA {
-            usMajorVersion: 1,
-            usMinorVersion: 0,
-            usBuildNumber: 0,
-            usRevisionNumber: 0,
-            szLocale: locale,
-            cbLocale: (locale_size-1) as ULONG,
-            rOS: ptr::null_mut(),
-            rProcessor: ptr::null_mut(),
-            ulProcessor: 0,
-            ulOS: 0
-        };
-
-        let assemby_name = String::from("helpers");
-        let name = U16String::from(assemby_name).as_ptr() as LPCWSTR;
-
-        hr = assembly_emit.define_assembly_ref(
-            public_token.as_ptr() as *const c_void,
-            public_token.len() as ULONG,
-            name,
-            &metadata,
-            ptr::null_mut(),
-            0,
-            0,
-            &mut assembly_ref
-        );
-
-        if hr < 0 {
-            error!("define_assembly_ref failed with hr=0x{:x}", hr);
-            return hr;
-        }*/
-
-        let mut hr: HRESULT = S_OK;
-
         let maybe_assembly_ref = define_assembly_reference(
             &assembly_emit,
             &[0xf3, 0x3c, 0xbf, 0xca, 0x3a, 0x74, 0xa3, 0xba],
@@ -224,67 +187,46 @@ impl ICorProfilerCallback for CorProfiler {
             "1.0.0.0"
         );
 
-        let mut assembly_ref: mdAssemblyRef = 0;
-        match maybe_assembly_ref {
-            Ok(assembly_reference) => {
-                assembly_ref = assembly_reference;
-            },
-            Err(hr) => {
-                error!("define_assembly_ref failed with hr=0x{:x}", hr);
-                return hr;
+        let assembly_ref = match maybe_assembly_ref {
+            Ok(assembly_ref) => assembly_ref,
+            Err(hresult) => {
+                error!("define_assembly_ref failed hr=0x{:x}", hresult);
+                return hresult;
             }
-        }
+        };
 
         info!("pushed helpers.dll ref to test.dll");
 
-        let mut type_ref: mdToken = 0;
-        
-        let class_name = OsStr::new("helpers.Class1")
-            .encode_wide()
-            .chain(Some(0).into_iter())
-            .collect::<Vec<_>>();
-
-        hr = metadata_emit.define_type_ref_by_name(
-            assembly_ref, 
-            class_name.as_ptr() as LPCWSTR,
-            &mut type_ref
+        let maybe_type_ref = define_type_ref(
+            &metadata_emit,
+            assembly_ref,
+            "helpers.Class1"
         );
 
-        info!("{}", "helpers.Class1");
-
-        if hr < 0 {
-            error!("define_type_ref_by_name failed with hr=0x{:x}", hr);
-            return hr;
-        }
+        let type_ref = match maybe_type_ref {
+            Ok(type_ref) => type_ref,
+            Err(hresult) => {
+                error!("define_type_ref failed hr=0x{:x}", hresult);
+                return hresult;
+            }
+        };
 
         info!("pushed helpers.Class1 (0x{:x}) ref to test.dll", type_ref);
-        
-        let signature: [COR_SIGNATURE; 4] = [
-            0x0,
-            0x1,                    
-            0x01,
-            0x0e
-        ];
 
-        let mut method_ref: mdMemberRef = 0;
-
-        let method_name = OsStr::new("Test")
-            .encode_wide()
-            .chain(Some(0).into_iter())
-            .collect::<Vec<_>>();
-
-        hr = metadata_emit.define_member_ref(
+        let maybe_method_ref = define_member_ref(
+            &metadata_emit,
             type_ref,
-            method_name.as_ptr(),
-            signature.as_ptr(),
-            signature.len() as ULONG,
-            &mut method_ref
+            "Test",
+            &[0x0, 0x1, 0x01, 0x0e]
         );
 
-        if hr < 0 {
-            error!("define_member_ref failed with hr=0x{:x}", hr);
-            return hr;
-        }
+        let method_ref = match maybe_method_ref {
+            Ok(method_ref) => method_ref,
+            Err(hresult) => {
+                error!("define_member_ref failed hr=0x{:x}", hresult);
+                return hresult;
+            }
+        };
 
         info!("pushed helpers.Class1.Test (0x{:x}) ref to test.dll", method_ref);
 

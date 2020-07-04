@@ -57,13 +57,6 @@ pub struct FunctionFullNameInfo {
     pub function_name: String
 }
 
-pub struct AssemblyInfo<'a> {
-    pub public_token: &'a[BYTE],
-    pub name: &'a str,
-    pub locale: &'a str,
-    pub version: &'a str
-}
-
 impl fmt::Display for FunctionFullNameInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
         write!(f, r#"{}.{}.{}"#, self.module_name, self.class_name, self.function_name)
@@ -93,7 +86,6 @@ fn str_to_lpwstr_2(rust_str: &str) -> LPWSTR {
         .collect::<Vec<_>>()
         .as_ptr() as LPWSTR
 }
-
 
 pub fn get_meta_data_interface<I: ComInterface + ?Sized>(info: & ComPtr<dyn ICorProfilerInfo10>, module_id: ModuleID) -> Result<ComRc<I>, HRESULT> {
     
@@ -174,6 +166,67 @@ pub fn define_assembly_reference(
             Ok(assembly_ref)
         }
     }
+}
+
+pub fn define_type_ref(
+    metadata_emit: & ComRc<dyn IMetaDataEmit>,
+    resolution_scope: mdAssemblyRef,
+    type_name: &str
+) -> Result<mdTypeRef, HRESULT> {
+
+    let mut type_ref: mdToken = 0;
+        
+    let type_name_native = OsStr::new(type_name)
+        .encode_wide()
+        .chain(Some(0).into_iter())
+        .collect::<Vec<_>>();
+
+    unsafe {
+        let hr = metadata_emit.define_type_ref_by_name(
+            resolution_scope, 
+            type_name_native.as_ptr() as LPCWSTR,
+            &mut type_ref
+        );
+
+        if is_fail!(hr) {
+            Err(hr)
+        } else {
+            Ok(type_ref)
+        }
+    }
+
+}
+
+pub fn define_member_ref(
+    metadata_emit: & ComRc<dyn IMetaDataEmit>,
+    import_token: mdTypeRef,
+    member_name: &str,
+    signature: &[COR_SIGNATURE]
+) -> Result<mdTypeRef, HRESULT> {
+
+    let mut member_ref: mdMemberRef = 0;
+
+    let method_name_native = OsStr::new(member_name)
+        .encode_wide()
+        .chain(Some(0).into_iter())
+        .collect::<Vec<_>>();
+
+    unsafe {
+        let hr = metadata_emit.define_member_ref(
+            import_token,
+            method_name_native.as_ptr(),
+            signature.as_ptr(),
+            signature.len() as ULONG,
+            &mut member_ref
+        );
+
+        if is_fail!(hr) {
+            Err(hr)
+        } else {
+            Ok(member_ref)
+        }
+    }
+
 }
 
 pub unsafe fn il_test(info: & ComPtr<dyn ICorProfilerInfo10>, module_id: ModuleID, method_token: mdMethodDef) {
