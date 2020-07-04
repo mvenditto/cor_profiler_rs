@@ -1,5 +1,7 @@
 #[macro_use] 
 use crate::types::*;
+use crate::opcodes::OpCodes;
+use num_traits::FromPrimitive;
 
 use crate::interfaces::{
     ICorProfilerInfo,
@@ -56,15 +58,16 @@ impl<'a> ILInstr {
         }
     }
 
-    pub(crate) fn opcode(&self) -> UINT {
+    pub(crate) fn opcode(&self) -> OpCodes {
         unsafe {
-            return get_opcode(self.instr);
+            let opcode = get_opcode(self.instr);
+            FromPrimitive::from_u32(opcode).unwrap()
         }
     }
 
-    pub(crate) fn set_opcode(&mut self, opcode: UINT) {
+    pub(crate) fn set_opcode(&mut self, opcode: OpCodes) {
         unsafe {
-            return set_opcode(self.instr, opcode);
+            return set_opcode(self.instr, opcode as UINT);
         }
     }
 
@@ -146,6 +149,7 @@ impl Iterator for ILRewriter {
             let next = get_next(curr);
         
             if next.is_null() || next == head {
+                self.pointed_instr = head;
                 None
             }
             else
@@ -155,7 +159,6 @@ impl Iterator for ILRewriter {
             }
         }
     }
-
 }
 
 impl ILRewriter {
@@ -179,7 +182,7 @@ impl ILRewriter {
             return ILRewriter { 
                 rewriter: r, 
                 head_instr: head_instr,
-                pointed_instr: head_instr
+                pointed_instr: get_next(head_instr)
             }
         }
     }

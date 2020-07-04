@@ -2,11 +2,8 @@ use crate::types::*;
 use crate::interfaces::*;
 use crate::il_rewriter::*;
 
-use crate::opcodes::{
-    CEE_LDSTR,
-    CEE_LDARG_1,
-    CEE_CALL
-};
+use crate::opcodes::OpCodes;
+
 use crate::metadata_helpers::{
     get_meta_data_interface,
     get_module_name,
@@ -156,7 +153,7 @@ impl ICorProfilerCallback for CorProfiler {
 
     unsafe fn module_load_finished(&self, module_id: ModuleID, hr_status: HRESULT) -> HRESULT {
         
-        if hr_status <= 0 {
+        if hr_status < 0 {
             return hr_status;
         }
         
@@ -285,7 +282,7 @@ impl ICorProfilerCallback4 for CorProfiler {
         let info1 = info.get_interface::<dyn ICorProfilerInfo>().unwrap();
         let info2 = info.get_interface::<dyn ICorProfilerInfo2>().unwrap();
         
-        let rewriter = ILRewriter::new(
+        let mut rewriter = ILRewriter::new(
             (info1.as_raw()) as *mut *mut dyn ICorProfilerInfo,
             function_control,
             module_id,
@@ -312,27 +309,20 @@ impl ICorProfilerCallback4 for CorProfiler {
             error!("method_ref invalid 0x{:x}", method_ref);
         }
 
-        let instr = rewriter.get_il_list().get_next().unwrap();
-        let mut instr2 = instr;
+        let head = rewriter.get_il_list();
+        let instr = head.get_next().unwrap();
 
-        loop {
-            info!("pre_opcode: 0x{:x}", instr2.opcode());
-            
-            match instr2.get_next() {
-                Some(next) => instr2 = next,
-                _ => {}
-            }
-            
-            if instr2 == instr { break }
+        for i in &mut rewriter {
+            info!("pre_opcode: 0x{:x}", i.opcode());
         }
         
         let mut instr_0 = ILInstr::new();
-        instr_0.set_opcode(CEE_LDARG_1);
+        instr_0.set_opcode(OpCodes::CEE_LDARG_1);
         rewriter.insert_before(instr, instr_0);
 
         
         let mut instr_1 = ILInstr::new();
-        instr_1.set_opcode(CEE_CALL);
+        instr_1.set_opcode(OpCodes::CEE_CALL);
         instr_1.set_arg(ILInstrArgValue::Int32(method_ref));
         rewriter.insert_before(instr, instr_1);
 
@@ -342,16 +332,10 @@ impl ICorProfilerCallback4 for CorProfiler {
             error!("export failed with hr=0x{:x}", hr);
         }
 
-        loop {
-            info!("after_opcode: 0x{:x}", instr2.opcode());
-            
-            match instr2.get_next() {
-                Some(next) => instr2 = next,
-                _ => {}
-            }
-            
-            if instr2 == instr { break }
+        for i in &mut rewriter {
+            info!("after_opcode: 0x{:x}", i.opcode());
         }
+
         
         /*
         match new_string {

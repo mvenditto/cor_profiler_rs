@@ -10,7 +10,7 @@ use crate::types::UINT;
 #[repr(u32)]
 #[derive(FromPrimitive)]
 #[derive(ToPrimitive)]
-pub enum OpCode {
+pub enum OpCodes {
     CEE_NOP = 0,
     CEE_BREAK = 1,
     CEE_LDARG_0 = 2,
@@ -309,7 +309,7 @@ pub enum OpCode {
     CEE_SWITCH_ARG = 295
 }
 
-impl fmt::LowerHex for OpCode {
+impl fmt::LowerHex for OpCodes {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let val = ToPrimitive::to_u32(self).unwrap();
         fmt::LowerHex::fmt(&val, f) // delegate to u32 implementation
