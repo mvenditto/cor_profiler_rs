@@ -3,6 +3,11 @@ use crate::interfaces::*;
 use crate::il_rewriter::*;
 
 use crate::opcodes::OpCodes;
+use crate::cor_helpers::{
+    CorSignature,
+    CorCallingConvention,
+    CorElementType
+};
 
 use crate::metadata_helpers::{
     get_meta_data_interface,
@@ -210,11 +215,16 @@ impl ICorProfilerCallback for CorProfiler {
 
         info!("pushed helpers.Class1 (0x{:x}) ref to test.dll", type_ref);
 
+        let signature = CorSignature::new()
+            .call_conv(CorCallingConvention::IMAGE_CEE_CS_CALLCONV_DEFAULT)
+            .ret(CorElementType::ELEMENT_TYPE_VOID)
+            .arg(CorElementType::ELEMENT_TYPE_STRING);
+
         let maybe_method_ref = define_member_ref(
             &metadata_emit,
             type_ref,
             "Test",
-            &[0x0, 0x1, 0x01, 0x0e]
+            &signature.pack()
         );
 
         let method_ref = match maybe_method_ref {

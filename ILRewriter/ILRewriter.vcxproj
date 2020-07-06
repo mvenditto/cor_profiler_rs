@@ -134,11 +134,13 @@ copy /Y "$(TargetDir)$(ProjectName).dll" "$(SolutionDir)..\cor_profiler\target\d
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="cor_helpers.h" />
     <ClInclude Include="ilrewriter.h" />
     <ClInclude Include="ilrewriter_wrapper.h" />
     <ClInclude Include="sigparse.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="cor_helpers.cpp" />
     <ClCompile Include="ilrewriter.cpp" />
     <ClCompile Include="ilrewriter_wrapper.cpp" />
     <ClCompile Include="sigparse.cpp" />
