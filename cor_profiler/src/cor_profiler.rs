@@ -16,6 +16,7 @@ use crate::metadata_helpers::{
     define_assembly_reference,
     define_member_ref,
     define_type_ref,
+    get_module_info,
     il_test,
     new_user_string
 };
@@ -33,6 +34,7 @@ extern crate env_logger;
 extern crate com;
 use com::{
     co_class,
+    ComRc,
     ComPtr,
     interfaces::iunknown::IUnknown,
     sys::{HRESULT, S_OK},
@@ -60,7 +62,7 @@ macro_rules! check_failure {
     }
 }
 
-fn function_seen(info: & ComPtr<dyn ICorProfilerInfo10>, function_id: FunctionID) -> HRESULT {
+fn function_seen(info: & ComRc<dyn ICorProfilerInfo10>, function_id: FunctionID) -> HRESULT {
     // let info_borrow = info.borrow();
     // let info = info_borrow.as_ref().unwrap();
 
@@ -100,7 +102,7 @@ fn function_seen(info: & ComPtr<dyn ICorProfilerInfo10>, function_id: FunctionID
 
 #[co_class(implements(ICorProfilerCallback8))]
 pub(crate) struct CorProfiler<'a> {
-    prof_info: RefCell<Option<ComPtr<dyn ICorProfilerInfo10>>>,
+    prof_info: RefCell<Option<ComRc<dyn ICorProfilerInfo10>>>,
     hook_ref: RefCell<mdMemberRef>
 }
 
@@ -123,7 +125,7 @@ impl ICorProfilerCallback for CorProfiler {
 
         match maybe_prof_info {
             Some(info) => {
-                self.prof_info.replace(Some(info));
+                self.prof_info.replace(Some(info.upgrade()));
             }
             None => {
                 error!("Cannot get ICorProfilerInfo. Initialization Failed.");
@@ -158,14 +160,14 @@ impl ICorProfilerCallback for CorProfiler {
 
     unsafe fn module_load_finished(&self, module_id: ModuleID, hr_status: HRESULT) -> HRESULT {
         
-        if hr_status < 0 {
+        /*if hr_status < 0 {
             return hr_status;
-        }
+        }*/
+
         
         let info_borrow = self.prof_info.borrow();
         let info = info_borrow.as_ref().unwrap();
-        let info2 = info.get_interface::<dyn ICorProfilerInfo2>().unwrap();
-        
+
         let assembly_emit = 
             get_meta_data_interface::<dyn IMetaDataAssemblyEmit>(info, module_id).unwrap();
         
@@ -173,9 +175,38 @@ impl ICorProfilerCallback for CorProfiler {
             get_meta_data_interface::<dyn IMetaDataEmit>(info, module_id).unwrap();
         
 
-        let module_name = get_module_name(&info2, module_id).unwrap();
+        let module_name = get_module_name(info, module_id).unwrap();
 
         if !module_name.ends_with("test.dll") {
+
+            if module_name.contains("System.Private.CoreLib.dll") {
+                // test: extract DateTime type metadata token
+                info!("System.Private.CoreLib.dll");
+
+                let metadata_import = 
+                    get_meta_data_interface::<dyn IMetaDataImport>(info, module_id).unwrap();
+                
+                let mut date_time_tk: mdToken = 0;
+                
+                let type_name_native = OsStr::new("System.DateTime")
+                    .encode_wide()
+                    .chain(Some(0).into_iter())
+                    .collect::<Vec<_>>();
+
+                let hr = metadata_import.find_type_def_by_name(
+                    type_name_native.as_ptr(),
+                    0,
+                    &mut date_time_tk
+                );
+                  
+                if hr < 0 {
+                    error!("find_type_def_by_name hr=0x{:x} ", hr);
+                    return hr;
+                }
+
+                info!("DateTime token=0x{:x}", date_time_tk)
+            }
+
             return S_OK;
         }
 

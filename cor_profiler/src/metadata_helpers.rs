@@ -44,6 +44,14 @@ macro_rules! is_fail {
     }
 }
 
+pub struct ModuleInfo<'a> {
+    pub module_name: &'a str,
+    pub assembly_name: &'a str,
+    pub app_domain_id: AppDomainID,
+    pub metadata_import: &'a ComRc<dyn IMetaDataImport>,
+    pub metadata_emit: &'a ComRc<dyn IMetaDataEmit>
+}
+
 pub struct FunctionInfo {
     pub module_id: ModuleID,
     pub class_id: ClassID,
@@ -87,7 +95,35 @@ fn str_to_lpwstr_2(rust_str: &str) -> LPWSTR {
         .as_ptr() as LPWSTR
 }
 
-pub fn get_meta_data_interface<I: ComInterface + ?Sized>(info: & ComPtr<dyn ICorProfilerInfo10>, module_id: ModuleID) -> Result<ComRc<I>, HRESULT> {
+pub fn get_module_info<T: ComInterface + ICorProfilerInfo + ?Sized>(profiler_info: &ComRc<T>, module_id: ModuleID) -> Result<String, HRESULT> {
+
+    let mut buffer: [WCHAR; 256] = [0; 256];
+    let wstr = buffer.as_mut_ptr() as LPWSTR;
+    let mut mod_name_len: ULONG = 0;
+    let mod_name_internal: U16String;
+    let mut assembly_id: AssemblyID = 0;
+
+    unsafe {
+        let hr = profiler_info.get_module_info(
+            module_id,
+            ptr::null_mut(),
+            256,
+            &mut mod_name_len,
+            wstr,
+            &mut assembly_id
+        );
+
+        if is_fail!(hr) {
+            error!("get_module_info failed with hr=0x{:x}", hr);
+            return Err(hr)
+        }
+
+        mod_name_internal = U16String::from_ptr(wstr, (mod_name_len-1) as usize);
+        return Ok(mod_name_internal.to_string_lossy());
+    }
+}
+
+pub fn get_meta_data_interface<I: ComInterface + ?Sized>(info: & ComRc<dyn ICorProfilerInfo10>, module_id: ModuleID) -> Result<ComRc<I>, HRESULT> {
     
     let mut unkn: *mut c_void = ptr::null_mut();
 
@@ -229,7 +265,7 @@ pub fn define_member_ref(
 
 }
 
-pub unsafe fn il_test(info: & ComPtr<dyn ICorProfilerInfo10>, module_id: ModuleID, method_token: mdMethodDef) {
+pub unsafe fn il_test(info: & ComRc<dyn ICorProfilerInfo10>, module_id: ModuleID, method_token: mdMethodDef) {
     info!("il_test");
 
     let mut unkn: *mut c_void = ptr::null_mut();
@@ -246,7 +282,7 @@ pub unsafe fn il_test(info: & ComPtr<dyn ICorProfilerInfo10>, module_id: ModuleI
         error!("get_module_meta_data failed with hr=0x{:x}", hr);
     }
 
-    // let md_import = ComPtr::<dyn IMetaDataImport>::new(unkn as *mut _).upgrade();
+    // let md_import = ComRc::<dyn IMetaDataImport>::new(unkn as *mut _).upgrade();
 
     let mut code_size: ULONG = 0;
     let mut code_buff: LPCBYTE = ptr::null_mut();
@@ -266,7 +302,7 @@ pub unsafe fn il_test(info: & ComPtr<dyn ICorProfilerInfo10>, module_id: ModuleI
 
 }
 
-pub fn new_user_string(info: & ComPtr<dyn ICorProfilerInfo2>, module_id: ModuleID, string: String) -> Result<mdString, HRESULT> {
+pub fn new_user_string<T: ICorProfilerInfo2 + ComInterface + ?Sized>(info: & ComRc<T>, module_id: ModuleID, string: String) -> Result<mdString, HRESULT> {
     let mut token: mdString = 0;
     let size = string.len();
     let user_str_value = U16String::from(string).as_ptr() as LPCWSTR;
@@ -303,7 +339,7 @@ pub fn new_user_string(info: & ComPtr<dyn ICorProfilerInfo2>, module_id: ModuleI
     Ok(token)
 } 
 
-pub fn get_function_info(info: & ComPtr<dyn ICorProfilerInfo2>, function_id: FunctionID) -> Result<FunctionInfo, HRESULT> {
+pub fn get_function_info<T: ICorProfilerInfo2 + ComInterface + ?Sized>(info: & ComRc<T>, function_id: FunctionID) -> Result<FunctionInfo, HRESULT> {
     if function_id == 0 {
         warn!("Cannot retrieve name of a native function.");
         return Err(E_FAIL);
@@ -402,7 +438,7 @@ pub fn get_function_info(info: & ComPtr<dyn ICorProfilerInfo2>, function_id: Fun
     });
 }
 
-pub fn get_class_name(info: & ComPtr<dyn ICorProfilerInfo2>, class_id: ClassID) -> Result<String,HRESULT> {
+pub fn get_class_name<T: ICorProfilerInfo2 + ComInterface + ?Sized>(info: & ComRc<T>, class_id: ClassID) -> Result<String,HRESULT> {
 
     if class_id == 0 {
         warn!("class_id was null");
@@ -507,13 +543,13 @@ pub fn get_class_name(info: & ComPtr<dyn ICorProfilerInfo2>, class_id: ClassID) 
     return Ok(class_name);
 }
 
-pub fn get_function_name(info: & ComPtr<dyn ICorProfilerInfo2>, function_id: FunctionID) -> Result<String, HRESULT> {
+pub fn get_function_name<T: ICorProfilerInfo2 + ComInterface + ?Sized>(info: & ComRc<T>, function_id: FunctionID) -> Result<String, HRESULT> {
 
     return get_function_info(info, function_id).map(|info| info.function_name);
 
 }
 
-pub fn get_module_name(info: & ComPtr<dyn ICorProfilerInfo2>, module_id: ModuleID) -> Result<String, HRESULT> {
+pub fn get_module_name<T: ICorProfilerInfo + ComInterface + ?Sized>(info: &ComRc<T>, module_id: ModuleID) -> Result<String, HRESULT> {
 
     let mut buffer: [WCHAR; 256] = [0; 256];
     let wstr = buffer.as_mut_ptr() as LPWSTR;
@@ -542,7 +578,7 @@ pub fn get_module_name(info: & ComPtr<dyn ICorProfilerInfo2>, module_id: ModuleI
     return Ok(mod_name_internal.to_string_lossy());
 }
 
-pub fn get_function_fully_qualified_name(info: & ComPtr<dyn ICorProfilerInfo2>, function_id: FunctionID) -> Result<String, HRESULT> {
+pub fn get_function_fully_qualified_name<T: ICorProfilerInfo2 + ComInterface + ?Sized>(info: & ComRc<T>,  function_id: FunctionID) -> Result<String, HRESULT> {
     let func_info = match get_function_info(info, function_id) {
         Err(hr) => return Err(hr),
         Ok(func_info) => func_info
@@ -556,7 +592,7 @@ pub fn get_function_fully_qualified_name(info: & ComPtr<dyn ICorProfilerInfo2>, 
     return Ok(class_name + "." + &func_info.function_name);
 }
 
-pub fn get_function_name_info(info: & ComPtr<dyn ICorProfilerInfo2>, function_id: FunctionID) -> Result<FunctionFullNameInfo, HRESULT> {
+pub fn get_function_name_info<T: ICorProfilerInfo2 + ComInterface + ?Sized>(info: & ComRc<T>,  function_id: FunctionID) -> Result<FunctionFullNameInfo, HRESULT> {
 
     let func_info = match get_function_info(info, function_id) {
         Err(hr) => return Err(hr),
