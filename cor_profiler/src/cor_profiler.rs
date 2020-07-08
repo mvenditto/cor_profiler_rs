@@ -103,8 +103,8 @@ fn function_seen(info: & ComRc<dyn ICorProfilerInfo10>, function_id: FunctionID)
 }
 
 #[co_class(implements(ICorProfilerCallback8))]
-pub(crate) struct CorProfiler<'a> { // TODO: Bug, lifetime erased
-    prof_info: RefCell<Option<ComRc<dyn ICorProfilerInfo10>>>,
+pub(crate) struct CorProfiler { // TODO: Bug, lifetime and generics erased
+    prof_info: RefCell<Option<ComRc<dyn ICorProfilerInfo10>>>, // see Bug, should generify
     hook_ref: RefCell<mdMemberRef>,
     data_container: RefCell<HashMap<String, Rc<dyn DataItem>>> // see Bug, should use &str
 }
