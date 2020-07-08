@@ -26,7 +26,9 @@ use std::{
     ffi::c_void,
     cell::RefCell,
     ffi::OsStr,
-    os::windows::ffi::OsStrExt
+    os::windows::ffi::OsStrExt,
+    rc::Rc,
+    collections::HashMap
 };
 
 extern crate env_logger;
@@ -101,9 +103,10 @@ fn function_seen(info: & ComRc<dyn ICorProfilerInfo10>, function_id: FunctionID)
 }
 
 #[co_class(implements(ICorProfilerCallback8))]
-pub(crate) struct CorProfiler<'a> {
+pub(crate) struct CorProfiler<'a> { // TODO: Bug, lifetime erased
     prof_info: RefCell<Option<ComRc<dyn ICorProfilerInfo10>>>,
-    hook_ref: RefCell<mdMemberRef>
+    hook_ref: RefCell<mdMemberRef>,
+    data_container: RefCell<HashMap<String, Rc<dyn DataItem>>> // see Bug, should use &str
 }
 
 impl CorProfiler {
@@ -111,7 +114,24 @@ impl CorProfiler {
         CorProfiler::allocate(
             RefCell::new(None),
             RefCell::new(0),
+            RefCell::new(HashMap::new())
         )
+    }
+
+    pub(crate) fn get_profiler_info(&self) -> ComRc<dyn ICorProfilerInfo10> {
+        ComRc::clone(self.prof_info.borrow().as_ref().unwrap())
+    }
+}
+
+use crate::data_container::*;
+impl DataContainer for CorProfiler {
+
+    fn set_item(&self, key: String, item: Rc<dyn DataItem>) {
+        self.data_container.borrow_mut().insert(key, item);
+    }
+
+    fn get_item(&self, key: String) -> Option<Rc<dyn DataItem>> {
+        self.data_container.borrow().get(&key).map(Rc::clone)
     }
 }
 
@@ -164,9 +184,7 @@ impl ICorProfilerCallback for CorProfiler {
             return hr_status;
         }*/
 
-        
-        let info_borrow = self.prof_info.borrow();
-        let info = info_borrow.as_ref().unwrap();
+        let info = &self.get_profiler_info();
 
         let assembly_emit = 
             get_meta_data_interface::<dyn IMetaDataAssemblyEmit>(info, module_id).unwrap();
@@ -277,21 +295,7 @@ impl ICorProfilerCallback for CorProfiler {
         /*trace!("ICorProfilerCallback::jitcompilation_finished");*/ 
         trace!("ICorProfilerCallback::jitcached_function_search_finished"); 
 
-        let info_borrow = self.prof_info.borrow();
-        let info = info_borrow.as_ref().unwrap();
-
-        // let info2 = info.get_interface::<dyn ICorProfilerInfo2>().unwrap();
-        // let function_name = get_function_fully_qualified_name(&info2, function_id);
-        
-        /*
-        match function_name {
-            Ok(name) => 
-                info!("func_name: {}", name),
-            Err(hr) => 
-                warn!("cannot get name for function 0x{:x} reason: hr=0x{:x}", function_id, hr)
-        }*/
-
-        function_seen(info, function_id); 
+        function_seen(&self.get_profiler_info(), function_id); 
 
         S_OK 
     }
@@ -299,10 +303,7 @@ impl ICorProfilerCallback for CorProfiler {
     unsafe fn jit_cached_function_search_finished(&self, function_id: FunctionID, result: COR_PRF_JIT_CACHE) -> HRESULT { 
         trace!("ICorProfilerCallback::jitcached_function_search_finished");
         
-        let maybe_info = self.prof_info.borrow();
-        let info = maybe_info.as_ref().unwrap();
-        
-        function_seen(info, function_id); 
+        function_seen(&self.get_profiler_info(), function_id); 
         
         S_OK 
     }
@@ -318,13 +319,10 @@ impl ICorProfilerCallback4 for CorProfiler {
     unsafe fn get_re_jit_parameters(&self, module_id: ModuleID, method_id: mdMethodDef, function_control: *mut *mut dyn ICorProfilerFunctionControl) -> HRESULT { 
         info!("ICorProfilerCallback4::get_re_jit_parameters"); 
         
-        let info_borrow = self.prof_info.borrow();
-        let info = info_borrow.as_ref().unwrap();
-        let info1 = info.get_interface::<dyn ICorProfilerInfo>().unwrap();
-        let info2 = info.get_interface::<dyn ICorProfilerInfo2>().unwrap();
+        let info = &self.get_profiler_info();
         
         let mut rewriter = ILRewriter::new(
-            (info1.as_raw()) as *mut *mut dyn ICorProfilerInfo,
+            (info.as_raw()) as *mut *mut dyn ICorProfilerInfo,
             function_control,
             module_id,
             method_id
@@ -339,7 +337,7 @@ impl ICorProfilerCallback4 for CorProfiler {
         }
 
         let new_string = new_user_string(
-            &info2, 
+            info, 
             module_id, 
             String::from("Test!")
         );

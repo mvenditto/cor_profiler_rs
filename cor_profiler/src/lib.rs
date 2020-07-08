@@ -9,6 +9,7 @@ pub(crate) mod types;
 pub(crate) mod interfaces;
 pub(crate) mod metadata_helpers;
 pub(crate) mod cor_helpers;
+pub(crate) mod data_container;
 
 use cor_profiler::{
     CLSID_COR_PROFILER,
