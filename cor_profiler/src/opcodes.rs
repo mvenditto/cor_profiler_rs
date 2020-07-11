@@ -10,6 +10,8 @@ use crate::types::UINT;
 #[repr(u32)]
 #[derive(FromPrimitive)]
 #[derive(ToPrimitive)]
+#[derive(PartialEq)]
+#[derive(Debug)]
 pub enum OpCodes {
     CEE_NOP = 0,
     CEE_BREAK = 1,
