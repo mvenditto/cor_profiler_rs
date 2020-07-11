@@ -1,12 +1,14 @@
 #![allow(non_camel_case_types)]
 #![allow(dead_code)]
 
-use std::ffi::c_void;
+use std::{slice, ffi::c_void};
 use num_derive::FromPrimitive;
 use num_derive::ToPrimitive; 
 
 use crate::types::{
     mdToken,
+    mdTypeDef,
+    mdTypeRef,
     COR_SIGNATURE,
     ULONG
 };
@@ -16,6 +18,7 @@ pub(crate) struct CorSignature {
 }
 
 impl CorSignature {
+
     pub fn new() -> CorSignature {
         CorSignature {
             arguments: vec![
@@ -42,17 +45,28 @@ impl CorSignature {
         self
     }
 
-    pub fn arg_class(mut self, token: mdToken) -> CorSignature {
+    fn add_complex_arg(&mut self, token: mdToken, arg_type: CorElementType) {
         self.arguments[1] += 1;
-        self.arguments.push(CorElementType::ELEMENT_TYPE_CLASS as COR_SIGNATURE);
-        self.arguments.push(0);
-        self.arguments.push(0);
-        self.arguments.push(0);
-        self.arguments.push(0);
-        let compressed_tok_pointer = self.arguments.as_mut_ptr() as *mut c_void;
+        self.arguments.push(arg_type as COR_SIGNATURE);
+        // let compressed_tok_pointer = self.arguments.as_mut_ptr() as *mut c_void;
         unsafe {
-            cor_sig_compress_token(token, compressed_tok_pointer);
+            let mut tk_len: ULONG = 0;
+            let x = cor_sig_compress_token_2(token, &mut tk_len);
+            let ct: &[COR_SIGNATURE] = slice::from_raw_parts(x, 4);
+            for i in 0..tk_len {
+                self.arguments.push(ct[i as usize]);
+            }
+            info!("compressed_token: {:?} - {}", &ct[0 .. tk_len as usize], tk_len);
         }
+    }
+
+    pub fn arg_class(mut self, token: mdTypeDef) -> CorSignature {
+        self.add_complex_arg(token, CorElementType::ELEMENT_TYPE_CLASS);
+        self
+    }
+
+    pub fn arg_value_type(mut self, token: mdTypeDef) -> CorSignature {
+        self.add_complex_arg(token, CorElementType::ELEMENT_TYPE_VALUETYPE);
         self
     }
 
@@ -132,4 +146,6 @@ pub(crate) enum CorElementType {
 #[link(name = "ILRewriter", kind="static")]
 extern {
     pub fn cor_sig_compress_token(token: mdToken, out_buff: *mut c_void) -> ULONG;
+
+    pub fn cor_sig_compress_token_2(token: mdToken, compressed_tk_len: *mut ULONG) -> *mut COR_SIGNATURE;
 }
