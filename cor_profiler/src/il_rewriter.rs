@@ -112,6 +112,12 @@ impl<'a> ILInstr {
             set_arg_instr(self.instr, arg.instr);
         }
     }
+
+    pub(crate) fn get_arg_8(&self) -> INT8 {
+        unsafe {
+            get_arg_8(self.instr)
+        }
+    }
 }
 
 impl PartialEq for ILInstr {
@@ -258,6 +264,8 @@ extern {
     pub fn set_arg_8(instr: C_ILInstr, arg: INT8);
 
     pub fn set_arg_instr(instr: C_ILInstr, arg: C_ILInstr);
+
+    pub fn get_arg_8(instr: C_ILInstr) -> INT8;
 
     pub fn get_next(instr: C_ILInstr) -> C_ILInstr;
 }

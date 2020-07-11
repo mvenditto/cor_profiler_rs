@@ -53,4 +53,6 @@ extern "C" {
 
     __declspec(dllexport) void __cdecl set_arg_instr(C_ILInstr instr, C_ILInstr target);
 
+    __declspec(dllexport) INT8 __cdecl get_arg_8(C_ILInstr instr);
+
 }

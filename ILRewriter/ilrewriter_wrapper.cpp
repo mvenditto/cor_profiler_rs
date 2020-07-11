@@ -102,3 +102,8 @@ void __cdecl set_arg_instr(C_ILInstr instr, C_ILInstr target)
 {
     instr->m_pTarget = target;
 }
+
+INT8 __cdecl get_arg_8(C_ILInstr instr) 
+{
+    return instr->m_Arg8;
+}
