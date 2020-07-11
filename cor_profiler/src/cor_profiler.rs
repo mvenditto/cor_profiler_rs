@@ -1,3 +1,4 @@
+use crate::metadata_helpers::get_function_name;
 use crate::types::*;
 use crate::interfaces::*;
 use crate::il_rewriter::*;
@@ -18,7 +19,7 @@ use crate::metadata_helpers::{
     define_type_ref,
     get_module_info,
     il_test,
-    new_user_string
+    new_user_string, enum_type_refs
 };
 
 use std::{
@@ -28,7 +29,7 @@ use std::{
     ffi::OsStr,
     os::windows::ffi::OsStrExt,
     rc::Rc,
-    collections::HashMap
+    collections::HashMap, borrow::Borrow
 };
 
 extern crate env_logger;
@@ -81,7 +82,7 @@ fn function_seen(info: & ComRc<dyn ICorProfilerInfo10>, function_id: FunctionID)
             match get_module_name(&info2, i.module_id) {
                 Err(hr) => return hr,
                 Ok(module_name) => {
-                    if module_name.ends_with("test.dll") && i.function_name == "TestMethod" {
+                    if module_name.ends_with("test.dll") && i.function_name == "TestMethodDate" {
                         
                         info!("request re_jit_with_inliners for {}", i.function_name);
                         
@@ -106,7 +107,7 @@ fn function_seen(info: & ComRc<dyn ICorProfilerInfo10>, function_id: FunctionID)
 pub(crate) struct CorProfiler { // TODO: Bug, lifetime and generics erased
     prof_info: RefCell<Option<ComRc<dyn ICorProfilerInfo10>>>, // see Bug, should generify
     hook_ref: RefCell<mdMemberRef>,
-    data_container: RefCell<HashMap<String, Rc<dyn DataItem>>> // see Bug, should use &str
+    data_container: RefCell<HashMap<String, Rc<DataItems>>> // see Bug, should use &str
 }
 
 impl CorProfiler {
@@ -124,16 +125,22 @@ impl CorProfiler {
 }
 
 use crate::data_container::*;
-impl DataContainer for CorProfiler {
+impl DataContainer<DataItems> for CorProfiler {
 
-    fn set_item(&self, key: String, item: Rc<dyn DataItem>) {
+    fn set_item(&self, key: String, item: Rc<DataItems>) {
         self.data_container.borrow_mut().insert(key, item);
     }
 
-    fn get_item(&self, key: String) -> Option<Rc<dyn DataItem>> {
+    fn get_item(&self, key: String) -> Option<Rc<DataItems>> {
         self.data_container.borrow().get(&key).map(Rc::clone)
     }
 }
+
+enum DataItems {
+    MetaDataToken(mdToken)
+}
+
+impl DataItem for DataItems { }
 
 impl ICorProfilerCallback for CorProfiler {
     unsafe fn initialize(&self, i_cor_profiler_info_unk: ComPtr<dyn IUnknown>) -> HRESULT { 
@@ -153,8 +160,7 @@ impl ICorProfilerCallback for CorProfiler {
             }
         }
 
-        let maybe_info = self.prof_info.borrow();
-        let info = maybe_info.as_ref().unwrap();
+        let info = self.get_profiler_info();
 
         let event_mask_low = COR_PRF_ENABLE_REJIT |
             COR_PRF_MONITOR_JIT_COMPILATION |
@@ -192,39 +198,9 @@ impl ICorProfilerCallback for CorProfiler {
         let metadata_emit = 
             get_meta_data_interface::<dyn IMetaDataEmit>(info, module_id).unwrap();
         
-
         let module_name = get_module_name(info, module_id).unwrap();
 
         if !module_name.ends_with("test.dll") {
-
-            if module_name.contains("System.Private.CoreLib.dll") {
-                // test: extract DateTime type metadata token
-                info!("System.Private.CoreLib.dll");
-
-                let metadata_import = 
-                    get_meta_data_interface::<dyn IMetaDataImport>(info, module_id).unwrap();
-                
-                let mut date_time_tk: mdToken = 0;
-                
-                let type_name_native = OsStr::new("System.DateTime")
-                    .encode_wide()
-                    .chain(Some(0).into_iter())
-                    .collect::<Vec<_>>();
-
-                let hr = metadata_import.find_type_def_by_name(
-                    type_name_native.as_ptr(),
-                    0,
-                    &mut date_time_tk
-                );
-                  
-                if hr < 0 {
-                    error!("find_type_def_by_name hr=0x{:x} ", hr);
-                    return hr;
-                }
-
-                info!("DateTime token=0x{:x}", date_time_tk)
-            }
-
             return S_OK;
         }
 
@@ -268,7 +244,7 @@ impl ICorProfilerCallback for CorProfiler {
             .call_conv(CorCallingConvention::IMAGE_CEE_CS_CALLCONV_DEFAULT)
             .ret(CorElementType::ELEMENT_TYPE_VOID)
             .arg(CorElementType::ELEMENT_TYPE_STRING);
-
+        
         let maybe_method_ref = define_member_ref(
             &metadata_emit,
             type_ref,
@@ -286,7 +262,55 @@ impl ICorProfilerCallback for CorProfiler {
 
         info!("pushed helpers.Class1.Test (0x{:x}) ref to test.dll", method_ref);
 
-        self.hook_ref.replace(method_ref);
+        // self.hook_ref.replace(method_ref);
+        self.set_item(
+            "hook_ref".to_string(), 
+            Rc::new(DataItems::MetaDataToken(method_ref))
+        );
+
+        /*
+        let date_time_tk: mdTypeDef = match &*self.get_item("hook_ref".to_string()).unwrap() {
+            DataItems::MetaDataToken(token) => *token,
+            _ => {
+                error!("cannot retrieve stored token");
+                return E_FAIL;
+            }
+        };*/
+
+        let md_import = 
+            get_meta_data_interface::<dyn IMetaDataImport>(info, module_id).unwrap();
+
+        let date_time_tk = match enum_type_refs(&md_import, "System.DateTime") {
+            Ok(Some(date_time_type_ref)) => date_time_type_ref,
+            _ => return E_FAIL
+        };
+
+        let signature2 = CorSignature::new()
+            .call_conv(CorCallingConvention::IMAGE_CEE_CS_CALLCONV_DEFAULT)
+            .ret(CorElementType::ELEMENT_TYPE_VOID)
+            .arg_value_type(date_time_tk);
+
+        let maybe_method_ref_2 = define_member_ref(
+            &metadata_emit,
+            type_ref,
+            "TestData",
+            &signature2.pack()
+        );
+
+        let method_2_ref = match maybe_method_ref_2 {
+            Ok(method_ref) => method_ref,
+            Err(hresult) => {
+                error!("define_member_ref DateTimeTest failed hr=0x{:x}", hresult);
+                return hresult;
+            }
+        };
+
+        info!("pushed helpers.Class1.TestData (0x{:x}) ref to test.dll", method_2_ref);
+
+        self.set_item(
+            "date_test_snooper_ref".to_string(), 
+            Rc::new(DataItems::MetaDataToken(method_2_ref))
+        );
 
         S_OK
     }
@@ -342,7 +366,16 @@ impl ICorProfilerCallback4 for CorProfiler {
             String::from("Test!")
         );
 
-        let method_ref = *self.hook_ref.borrow();
+        //let method_ref = *self.hook_ref.borrow();
+        let data_item = &*self.get_item("date_test_snooper_ref".to_string()).unwrap();
+        
+        let method_ref = match data_item {
+            DataItems::MetaDataToken(token) => *token as mdMemberRef,
+            _ => {
+                error!("cannot retrieve stored token");
+                return E_FAIL;
+            }
+        };
 
         if method_ref <= 0 {
             error!("method_ref invalid 0x{:x}", method_ref);
@@ -352,14 +385,20 @@ impl ICorProfilerCallback4 for CorProfiler {
         let instr = head.get_next().unwrap();
 
         for i in &mut rewriter {
-            info!("pre_opcode: 0x{:x}", i.opcode());
+            info!("pre_opcode: {:?}", i.opcode());
+            info!("\tldarg.s index: 0x{:x}", i.get_arg_8());
         }
         
         let mut instr_0 = ILInstr::new();
-        instr_0.set_opcode(OpCodes::CEE_LDARG_1);
+        instr_0.set_opcode(OpCodes::CEE_LDARG_0);
         rewriter.insert_before(instr, instr_0);
 
-        
+        /*
+        let mut instr_1 = ILInstr::new();
+        instr_1.set_opcode(OpCodes::CEE_CALL);
+        instr_1.set_arg(ILInstrArgValue::Int32(method_ref));
+        rewriter.insert_before(instr, instr_1);*/
+
         let mut instr_1 = ILInstr::new();
         instr_1.set_opcode(OpCodes::CEE_CALL);
         instr_1.set_arg(ILInstrArgValue::Int32(method_ref));
@@ -372,40 +411,9 @@ impl ICorProfilerCallback4 for CorProfiler {
         }
 
         for i in &mut rewriter {
-            info!("after_opcode: 0x{:x}", i.opcode());
+            info!("after_opcode: {:?}", i.opcode());
+            info!("\tldarg.s index: 0x{:x}", i.get_arg_8());
         }
-
-        
-        /*
-        match new_string {
-            Err(hr) => {
-                error!("cannot define user string hr=0x{:x}", hr)
-            },
-            Ok(token) => {
-                let head_instr = rewriter.get_il_list();
-                let mut instr = head_instr;
-                loop {
-                    if instr.opcode() == CEE_LDSTR {
-                        info!("found ldstr");
-                        instr.set_arg_32(token);
-                    }
-                    info!("0x{:x}", instr.opcode());
-                    
-                    match instr.get_next() {
-                        Some(next) => instr = next,
-                        _ => {}
-                    }
-                    
-                    if instr == head_instr { break }
-                }
-
-                hr = rewriter.export();
-
-                if hr < 0 {
-                    error!("export failed with hr=0x{:x}", hr);
-                }
-            }
-        }*/
 
         S_OK 
     }
