@@ -84,7 +84,7 @@ fn str_to_lpcwstr_2(rust_str: &str) -> LPCWSTR {
 }
 
 fn str_to_lpwstr_1(rust_str: &str) -> LPWSTR {
-    U16String::from(rust_str.to_owned()).as_ptr() as LPWSTR
+    U16CString::from_str(rust_str.to_string()).unwrap().as_ptr() as LPWSTR
 }
 
 fn str_to_lpwstr_2(rust_str: &str) -> LPWSTR {
@@ -166,9 +166,19 @@ pub fn define_assembly_reference(
         .collect();
 
     let (major, minor, build, revision) = (v[0], v[1], v[2], v[3]);
-    let locale = str_to_lpwstr_2(assembly_locale);
-    let name = str_to_lpwstr_2(assembly_name);
-    
+
+    let locale = OsStr::new(assembly_locale)
+        .encode_wide()
+        .chain(Some(0).into_iter())
+        .collect::<Vec<_>>()
+        .as_ptr() as LPWSTR;
+
+    let name = OsStr::new(assembly_name)
+        .encode_wide()
+        .chain(Some(0).into_iter())
+        .collect::<Vec<_>>()
+        .as_ptr() as LPWSTR;
+
     let metadata = ASSEMBLYMETADATA {
         usMajorVersion: major,
         usMinorVersion: minor,
@@ -229,6 +239,67 @@ pub fn define_type_ref(
         } else {
             Ok(type_ref)
         }
+    }
+
+}
+
+pub fn enum_type_refs(
+    metadata_import: &ComRc<dyn IMetaDataImport>,
+    type_name: &str
+) -> Result<Option<mdTypeRef>,HRESULT> {
+
+    let mut type_refs_enum: HCORENUM = ptr::null_mut() as *mut c_void;
+    let mut type_refs_buff: [mdTypeRef;1024] = [0; 1024];
+    let mut num_tokens: ULONG = 0;
+    let mut type_def_name_buffer: [WCHAR; 256] = [0; 256];
+    // let mut mod_ref_name_buffer: [WCHAR; 256] = [0; 256];
+    let mut num_chars: ULONG = 0;
+    // let mut attr_flags: DWORD = 0;
+    // let mut tk_extends: mdToken = 0;
+    let mut resolution_scope: mdToken = 0;
+    let mut hr: HRESULT = S_OK;
+    // let  = buffer.as_mut_ptr() as LPWSTR;
+
+    unsafe {
+        loop {
+            
+            hr = metadata_import.enum_type_refs(
+                &mut type_refs_enum,
+                type_refs_buff.as_mut_ptr(),
+                1024 as ULONG,
+                &mut num_tokens
+            );
+
+            for i in 0..num_tokens {
+
+                hr = metadata_import.get_type_ref_props(
+                    type_refs_buff[i as usize],
+                    &mut resolution_scope,
+                    type_def_name_buffer.as_mut_ptr() as LPWSTR,
+                    255 as ULONG,
+                    &mut num_chars
+                );
+                
+                let native = 
+                    U16String::from_ptr(
+                      type_def_name_buffer.as_mut_ptr() as LPWSTR, 
+                    (num_chars - 1) as usize).to_string_lossy();
+                if native == type_name {
+                    metadata_import.close_enum(type_refs_enum);
+                    return Ok(Some(type_refs_buff[i as usize]))
+                }
+            }
+
+            if hr < 0 { break; }
+        }
+
+        metadata_import.close_enum(type_refs_enum);
+
+        if hr < 0 {
+            return Err(hr);
+        }
+    
+        return Ok(None);
     }
 
 }
