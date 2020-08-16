@@ -1,6 +1,10 @@
 use serde_yaml;
 use serde_yaml::Value;
+use std::fmt::Display;
 
+#[derive(PartialEq)]
+#[derive(Eq)]
+#[derive(Debug)]
 pub(crate) struct TargetMethod {
     assembly_name: String,
     type_name: String,
@@ -8,6 +12,9 @@ pub(crate) struct TargetMethod {
     type_names: Vec<String>
 }
 
+#[derive(PartialEq)]
+#[derive(Eq)]
+#[derive(Debug)]
 pub(crate) struct HookMethod {
     assembly_name: String,
     assembly_version: String,
@@ -25,7 +32,7 @@ pub(crate) struct HookEntry {
 }
 
 pub(crate) struct HooksRegistry {
-    hooks: Vec<HookEntry>
+    pub hooks: Vec<HookEntry>
 }
 
 impl HooksRegistry {
@@ -36,9 +43,9 @@ impl HooksRegistry {
     }
 
     // TODO: consider assembly also
-    fn get_function_hooks(self, fully_qualified_function_name: &str) -> Option<HookMethod> {
+    pub fn get_function_hooks(self, fully_qualified_function_name: &str) -> Option<HookMethod> {
         for x in self.hooks {
-            let target_method_name = format!("{}{}",
+            let target_method_name = format!("{}.{}",
                 x.target.type_name, x.target.method_name
             );
             if target_method_name == fully_qualified_function_name {
