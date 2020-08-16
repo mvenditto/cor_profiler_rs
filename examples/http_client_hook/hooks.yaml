@@ -1,17 +1,22 @@
 - 
+  name: "test hook"
   target:
       assembly: System.Net.Http
       type: System.Net.Http.HttpClient
       method:
           name: PrepareRequestMessage
-          return_type: void
+          return_type: System.Void
           argument_types:
               - System.Net.Http.HttpRequestMessage
   hook:
-      assembly: Helpers
+      assembly:
+        name: Helpers
+        version: "1.0.0.0"
+        culture: "neutral"
+        public_key_token: [0xf3, 0x3c, 0xbf, 0xca, 0x3a, 0x74, 0xa3, 0xba]
       type: Helpers.Class1
       method:
           name: HttpClientSendAsyncHook
-          return_type: void
+          return_type: System.Void
           argument_types:
               - System.Net.Http.HttpRequestMessage

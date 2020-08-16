@@ -68,6 +68,8 @@ pub struct ModuleInfo<'a> {
 pub struct FunctionInfo<'a> {
     pub module_id: ModuleID,
     pub class_id: ClassID,
+    pub parent_token: mdToken,
+    pub type_info: TypeInfo,
     pub metadata_token: mdToken,
     pub function_name: String,
     pub signature: &'a[COR_SIGNATURE],
@@ -81,8 +83,8 @@ pub struct FunctionFullNameInfo {
 }
 
 pub struct TypeInfo {
-    type_name: String,
-    metadata_token: mdToken
+    pub type_name: String,
+    pub metadata_token: mdToken
 }
 
 impl fmt::Display for FunctionFullNameInfo {
@@ -707,12 +709,14 @@ pub fn get_function_info<T: ICorProfilerInfo2 + ComInterface + ?Sized>(info: & C
 
     let mut class_id: ClassID = 0;
     let mut module_id: ModuleID = 0;
+    let mut parent_token: mdToken = mdTokenNil;
     let mut token: mdToken = 0;
     let mut n_type_args: ULONG32 = 0;
     let mut type_args: [ClassID; 32] = [0; 32];   
     let frame_info: COR_PRF_FRAME_INFO = 0;
     let mut func_name = String::new();
     let signature: &[COR_SIGNATURE];
+    let mut type_info: TypeInfo;
 
     unsafe {
         let mut hr;
@@ -727,6 +731,26 @@ pub fn get_function_info<T: ICorProfilerInfo2 + ComInterface + ?Sized>(info: & C
             &mut n_type_args,
             type_args.as_mut_ptr()
         );
+
+        let metadata_import= 
+            get_meta_data_interface::<T, dyn IMetaDataImport2>(info, module_id).unwrap();
+
+        let type_token = type_from_token!(token);
+        let cor_token_type: CorTokenType = FromPrimitive::from_u32(type_token).unwrap();
+
+        match cor_token_type {
+            mdtMemberRef => hr = metadata_import.get_member_ref_props(
+                token, &mut parent_token, ptr::null_mut(), 0, ptr::null_mut(), ptr::null_mut(), ptr::null_mut()),
+            mdtMethodDef => hr = metadata_import.get_member_props(
+                token, &mut parent_token, ptr::null_mut(), 0, ptr::null_mut(), 
+                ptr::null_mut(), ptr::null_mut(), ptr::null_mut(), ptr::null_mut(), 
+                ptr::null_mut(), ptr::null_mut(), ptr::null_mut(), ptr::null_mut()),
+            mdtMethodSpec => hr = metadata_import.get_method_spec_props(
+                token, &mut parent_token, ptr::null_mut(), ptr::null_mut()),
+            _ => ()
+        }
+
+        type_info = get_type_info(&metadata_import, parent_token).unwrap();
 
         if is_fail!(hr) {
             error!("get_function_info2 failed with hr=0x{:x}", hr);
@@ -799,6 +823,8 @@ pub fn get_function_info<T: ICorProfilerInfo2 + ComInterface + ?Sized>(info: & C
 
     return Ok(FunctionInfo {
         class_id,
+        type_info,
+        parent_token,
         module_id,
         metadata_token: token,
         function_name: String::from(func_name),

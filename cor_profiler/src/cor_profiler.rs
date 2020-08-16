@@ -22,6 +22,7 @@ use crate::metadata_helpers::{
     il_test,
     new_user_string, 
     enum_type_refs,
+    get_class_name,
     get_function_signatures_types
 };
 
@@ -80,6 +81,8 @@ fn function_seen(info: & ComRc<dyn ICorProfilerInfo10>, function_id: FunctionID)
         Ok(func_info) => func_info
     };
 
+    let module_name = get_module_name(info, function_info.module_id).unwrap();
+
     if function_info.function_name.starts_with("PrepareRequestMessage") {
         
         let metadata_import = 
@@ -87,11 +90,13 @@ fn function_seen(info: & ComRc<dyn ICorProfilerInfo10>, function_id: FunctionID)
                 &info2, function_info.module_id).unwrap();
 
         match get_function_signatures_types(&metadata_import, &function_info) {
-            Ok(types) => info!("function seen: id=0x{:x} \n\tname={} \n\tsignature={:?} \n\ttypes={:?}", 
+            Ok(type_names) => info!("function seen: id=0x{:x} \n\tname={}.{} \n\tsignature={:?} \n\ttypes={:?} \n\tassembly={}", 
                     function_info.metadata_token, 
+                    function_info.type_info.type_name,
                     function_info.function_name, 
                     function_info.signature,
-                    types
+                    type_names,
+                    module_name
                 ),
             Err(hr) => check_failure!(hr, "get_function_signatures_types")
         }
