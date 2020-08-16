@@ -10,6 +10,8 @@ use crate::cor_helpers::{
 };
 use crate::sig_parser::parse_signature;
 
+use crate::hooks_loader::*;
+
 use crate::metadata_helpers::{
     get_meta_data_interface,
     get_module_name,
@@ -85,6 +87,14 @@ fn function_seen(info: & ComRc<dyn ICorProfilerInfo10>, function_id: FunctionID)
 
     if function_info.function_name.starts_with("PrepareRequestMessage") {
         
+        let hooks = 
+            HooksRegistry::load("C:\\Users\\Dev\\Downloads\\cor_prof\\examples\\http_client_hook\\hooks.yaml");
+
+        let h = hooks.get_function_hooks(
+            &format!("{}.{}", function_info.type_info.type_name, function_info.function_name));
+
+        info!("hook: {:?}", h);
+
         let metadata_import = 
             get_meta_data_interface::<dyn ICorProfilerInfo2, dyn IMetaDataImport2>(
                 &info2, function_info.module_id).unwrap();
