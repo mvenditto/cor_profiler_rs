@@ -2,13 +2,13 @@ use crate::metadata_helpers::get_function_name;
 use crate::types::*;
 use crate::interfaces::*;
 use crate::il_rewriter::*;
-
 use crate::opcodes::OpCodes;
 use crate::cor_helpers::{
     CorSignature,
     CorCallingConvention,
     CorElementType
 };
+use crate::sig_parser::parse_signature;
 
 use crate::metadata_helpers::{
     get_meta_data_interface,
@@ -18,8 +18,11 @@ use crate::metadata_helpers::{
     define_member_ref,
     define_type_ref,
     get_module_info,
+    enum_assembly_refs,
     il_test,
-    new_user_string, enum_type_refs
+    new_user_string, 
+    enum_type_refs,
+    get_function_signatures_types
 };
 
 use std::{
@@ -66,41 +69,35 @@ macro_rules! check_failure {
 }
 
 fn function_seen(info: & ComRc<dyn ICorProfilerInfo10>, function_id: FunctionID) -> HRESULT {
-    // let info_borrow = info.borrow();
-    // let info = info_borrow.as_ref().unwrap();
-
-    // info!("function seen 0x{:x}", function_id);
-
+    
     let info2 = info.get_interface::<dyn ICorProfilerInfo2>().unwrap();
     
-    let function_info = get_function_info(&info2, function_id);
-    
-    match function_info {
-        Err(hr) => 
-            hr,
-        Ok(mut i) => {
-            match get_module_name(&info2, i.module_id) {
-                Err(hr) => return hr,
-                Ok(module_name) => {
-                    if module_name.ends_with("test.dll") && i.function_name == "TestMethodDate" {
-                        
-                        info!("request re_jit_with_inliners for {}", i.function_name);
-                        
-                        unsafe {
-                            info.request_re_jit_with_inliners(
-                                COR_PRF_REJIT_BLOCK_INLINING | COR_PRF_REJIT_INLINING_CALLBACKS,
-                                1,
-                                &mut i.module_id,
-                                &mut i.metadata_token
-                            );
-                        }
-                    }
-                }
-                _ => ()
-            }
-            S_OK
+    let function_info = match get_function_info(&info2, function_id) {
+        Err(hr) => {
+            error!("get_function_info failed with hr=0x{:x}", hr);
+            return hr
+        }
+        Ok(func_info) => func_info
+    };
+
+    if function_info.function_name.starts_with("PrepareRequestMessage") {
+        
+        let metadata_import = 
+            get_meta_data_interface::<dyn ICorProfilerInfo2, dyn IMetaDataImport2>(
+                &info2, function_info.module_id).unwrap();
+
+        match get_function_signatures_types(&metadata_import, &function_info) {
+            Ok(types) => info!("function seen: id=0x{:x} \n\tname={} \n\tsignature={:?} \n\ttypes={:?}", 
+                    function_info.metadata_token, 
+                    function_info.function_name, 
+                    function_info.signature,
+                    types
+                ),
+            Err(hr) => check_failure!(hr, "get_function_signatures_types")
         }
     }
+
+    S_OK
 }
 
 #[co_class(implements(ICorProfilerCallback8))]
@@ -172,7 +169,7 @@ impl ICorProfilerCallback for CorProfiler {
         // set the profiler features we're interested in
         let hr = info.set_event_mask2(event_mask_low, 0x0);
         check_failure!(hr, "set_event_mask2");
-        
+
         hr 
     }
 
@@ -186,10 +183,12 @@ impl ICorProfilerCallback for CorProfiler {
 
     unsafe fn module_load_finished(&self, module_id: ModuleID, hr_status: HRESULT) -> HRESULT {
         
-        /*if hr_status < 0 {
+        if hr_status < 0 {
+            warn!("skip failed module module_id=0x{:x}", module_id);
             return hr_status;
-        }*/
+        }
 
+        /*
         let info = &self.get_profiler_info();
 
         let assembly_emit = 
@@ -200,7 +199,7 @@ impl ICorProfilerCallback for CorProfiler {
         
         let module_name = get_module_name(info, module_id).unwrap();
 
-        if !module_name.ends_with("test.dll") {
+        if !module_name.ends_with("System.Net.Http.dll") {
             return S_OK;
         }
 
@@ -280,6 +279,7 @@ impl ICorProfilerCallback for CorProfiler {
         let md_import = 
             get_meta_data_interface::<dyn IMetaDataImport>(info, module_id).unwrap();
 
+        /*
         let date_time_tk = match enum_type_refs(&md_import, "System.DateTime") {
             Ok(Some(date_time_type_ref)) => date_time_type_ref,
             _ => return E_FAIL
@@ -310,7 +310,63 @@ impl ICorProfilerCallback for CorProfiler {
         self.set_item(
             "date_test_snooper_ref".to_string(), 
             Rc::new(DataItems::MetaDataToken(method_2_ref))
+        );*/
+
+        let metadata_assembly_import = 
+            get_meta_data_interface::<dyn IMetaDataAssemblyImport>(&info, module_id).unwrap();
+
+        /*
+        let system_net_http_assembly = match enum_assembly_refs(&metadata_assembly_import, "System.Net.Http") {
+            Ok(Some(net_http_assembly_ref)) => net_http_assembly_ref,
+            _ => {
+                error!("failed getting System.Net.Http assemblyRef");
+                return E_FAIL
+            }
+        };
+
+        let http_req_msg_type_tk = define_type_ref(
+            &metadata_emit,
+            system_net_http_assembly,
+            "System.Net.Http.HttpRequestMessage"
+        ).unwrap();*/
+
+        let http_req_msg_type_tk = define_type_ref(
+            &metadata_emit,
+            0,
+            "System.Net.Http.HttpRequestMessage"
+        ).unwrap();
+
+        
+        let signature3 = CorSignature::new()
+            .call_conv(CorCallingConvention::IMAGE_CEE_CS_CALLCONV_DEFAULT)
+            .ret(CorElementType::ELEMENT_TYPE_VOID)
+            .arg_class(http_req_msg_type_tk);
+            //.arg(CorElementType::ELEMENT_TYPE_OBJECT);
+        info!("definign...");
+
+        let test_sig: &[COR_SIGNATURE] = &[0, 1, 1, 18, 129, 208];
+
+        let maybe_method_ref_3 = define_member_ref(
+            &metadata_emit,
+            type_ref,
+            "HttpClientSendAsyncHook3",
+            test_sig//&signature3.pack()
         );
+
+        let method_3_ref = match maybe_method_ref_3 {
+            Ok(method_ref) => method_ref,
+            Err(hresult) => {
+                error!("define_member_ref HttpClientSendAsyncHook2 failed hr=0x{:x}", hresult);
+                return hresult;
+            }
+        };
+
+        info!("pushed helpers.Class1.HttpClientSendAsyncHook (0x{:x}) ref to test.dll", method_3_ref);
+
+        self.set_item(
+            "http_client_send_async_hook".to_string(), 
+            Rc::new(DataItems::MetaDataToken(method_3_ref))
+        );*/
 
         S_OK
     }
@@ -342,7 +398,7 @@ impl ICorProfilerCallback4 for CorProfiler {
    
     unsafe fn get_re_jit_parameters(&self, module_id: ModuleID, method_id: mdMethodDef, function_control: *mut *mut dyn ICorProfilerFunctionControl) -> HRESULT { 
         info!("ICorProfilerCallback4::get_re_jit_parameters"); 
-        
+        /*
         let info = &self.get_profiler_info();
         
         let mut rewriter = ILRewriter::new(
@@ -367,7 +423,7 @@ impl ICorProfilerCallback4 for CorProfiler {
         );
 
         //let method_ref = *self.hook_ref.borrow();
-        let data_item = &*self.get_item("date_test_snooper_ref".to_string()).unwrap();
+        let data_item = &*self.get_item("http_client_send_async_hook".to_string()).unwrap();
         
         let method_ref = match data_item {
             DataItems::MetaDataToken(token) => *token as mdMemberRef,
@@ -384,37 +440,43 @@ impl ICorProfilerCallback4 for CorProfiler {
         let head = rewriter.get_il_list();
         let instr = head.get_next().unwrap();
 
+        info!("IL pre-rewriter:");
         for i in &mut rewriter {
-            info!("pre_opcode: {:?}", i.opcode());
-            info!("\tldarg.s index: 0x{:x}", i.get_arg_8());
+            print!("\t{:?}", i.opcode());
+            if i.opcode() == OpCodes::CEE_CALL {
+                print!(" 0x{:x}", i.get_arg_32());
+                if i.get_arg_32() == 0x06000219 {
+                    i.set_arg_32(0x06000219);
+                    print!(" <== redirected")
+                }
+            }
+            println!("")
         }
+
         
         let mut instr_0 = ILInstr::new();
-        instr_0.set_opcode(OpCodes::CEE_LDARG_0);
+        instr_0.set_opcode(OpCodes::CEE_LDARG_1);
         rewriter.insert_before(instr, instr_0);
-
-        /*
-        let mut instr_1 = ILInstr::new();
-        instr_1.set_opcode(OpCodes::CEE_CALL);
-        instr_1.set_arg(ILInstrArgValue::Int32(method_ref));
-        rewriter.insert_before(instr, instr_1);*/
 
         let mut instr_1 = ILInstr::new();
         instr_1.set_opcode(OpCodes::CEE_CALL);
         instr_1.set_arg(ILInstrArgValue::Int32(method_ref));
         rewriter.insert_before(instr, instr_1);
-
+        
         hr = rewriter.export();
 
         if hr < 0 {
             error!("export failed with hr=0x{:x}", hr);
         }
 
+        info!("IL post-rewriter:");
         for i in &mut rewriter {
-            info!("after_opcode: {:?}", i.opcode());
-            info!("\tldarg.s index: 0x{:x}", i.get_arg_8());
-        }
-
+            print!("\t{:?}", i.opcode());
+            if i.opcode() == OpCodes::CEE_CALL {
+                print!(" 0x{:x}", i.get_arg_32());
+            }
+            println!("")
+        }*/
         S_OK 
     }
 }

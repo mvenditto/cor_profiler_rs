@@ -1,5 +1,6 @@
 #![allow(non_camel_case_types)]
 #![allow(dead_code)]
+#[macro_use]
 
 use std::{slice, ffi::c_void};
 use num_derive::FromPrimitive;
@@ -10,7 +11,8 @@ use crate::types::{
     mdTypeDef,
     mdTypeRef,
     COR_SIGNATURE,
-    ULONG
+    ULONG,
+    ULONG32
 };
 
 pub(crate) struct CorSignature {
@@ -22,9 +24,9 @@ impl CorSignature {
     pub fn new() -> CorSignature {
         CorSignature {
             arguments: vec![
-                CorCallingConvention::IMAGE_CEE_CS_CALLCONV_DEFAULT as COR_SIGNATURE,
-                0,
-                CorElementType::ELEMENT_TYPE_VOID as COR_SIGNATURE
+                CorCallingConvention::IMAGE_CEE_CS_CALLCONV_DEFAULT as COR_SIGNATURE,   // callconv
+                0,  // arguments number
+                CorElementType::ELEMENT_TYPE_VOID as COR_SIGNATURE // return type
             ]
         }
     }
@@ -48,12 +50,12 @@ impl CorSignature {
     fn add_complex_arg(&mut self, token: mdToken, arg_type: CorElementType) {
         self.arguments[1] += 1;
         self.arguments.push(arg_type as COR_SIGNATURE);
-        // let compressed_tok_pointer = self.arguments.as_mut_ptr() as *mut c_void;
         unsafe {
             let mut tk_len: ULONG = 0;
             let x = cor_sig_compress_token_2(token, &mut tk_len);
             let ct: &[COR_SIGNATURE] = slice::from_raw_parts(x, 4);
             for i in 0..tk_len {
+                info!("push byte {:x} to signature", ct[i as usize]);
                 self.arguments.push(ct[i as usize]);
             }
             info!("compressed_token: {:?} - {}", &ct[0 .. tk_len as usize], tk_len);
@@ -71,6 +73,7 @@ impl CorSignature {
     }
 
     pub fn pack<'a>(self) -> Vec<COR_SIGNATURE> {
+        info!("produced cor_sig: {:?}", self.arguments);
         self.arguments
     }
 }
@@ -143,9 +146,45 @@ pub(crate) enum CorElementType {
     ELEMENT_TYPE_PINNED         = 0x05 | 0x40
 }
 
+#[derive(FromPrimitive)]
+#[derive(ToPrimitive)]
+#[repr(u32)]
+pub(crate) enum CorTokenType
+{
+    mdtModule               = 0x00000000,       //
+    mdtTypeRef              = 0x01000000,       //
+    mdtTypeDef              = 0x02000000,       //
+    mdtFieldDef             = 0x04000000,       //
+    mdtMethodDef            = 0x06000000,       //
+    mdtParamDef             = 0x08000000,       //
+    mdtInterfaceImpl        = 0x09000000,       //
+    mdtMemberRef            = 0x0a000000,       //
+    mdtCustomAttribute      = 0x0c000000,       //
+    mdtPermission           = 0x0e000000,       //
+    mdtSignature            = 0x11000000,       //
+    mdtEvent                = 0x14000000,       //
+    mdtProperty             = 0x17000000,       //
+    mdtMethodImpl           = 0x19000000,       //
+    mdtModuleRef            = 0x1a000000,       //
+    mdtTypeSpec             = 0x1b000000,       //
+    mdtAssembly             = 0x20000000,       //
+    mdtAssemblyRef          = 0x23000000,       //
+    mdtFile                 = 0x26000000,       //
+    mdtExportedType         = 0x27000000,       //
+    mdtManifestResource     = 0x28000000,       //
+    mdtGenericParam         = 0x2a000000,       //
+    mdtMethodSpec           = 0x2b000000,       //
+    mdtGenericParamConstraint = 0x2c000000,
+    mdtString               = 0x70000000,       //
+    mdtName                 = 0x71000000,       //
+    mdtBaseType             = 0x72000000,       // Leave this on the high end value. This does not correspond to metadata table
+}
+
 #[link(name = "ILRewriter", kind="static")]
 extern {
     pub fn cor_sig_compress_token(token: mdToken, out_buff: *mut c_void) -> ULONG;
 
     pub fn cor_sig_compress_token_2(token: mdToken, compressed_tk_len: *mut ULONG) -> *mut COR_SIGNATURE;
+
+    pub fn cor_sig_uncompress_token_2(sig: *const COR_SIGNATURE, uncompressed_tk_len: *mut ULONG) -> mdToken;
 }

@@ -74,3 +74,15 @@ pub trait IMetaDataImport: IUnknown {
     unsafe fn get_native_call_conv_from_sig(&self, pv_sig: *const BYTE, cb_sig: ULONG, p_call_conv: *mut ULONG) -> HRESULT;
     unsafe fn is_global(&self, tk: mdToken, pb_is_global: *mut INT) -> HRESULT;
 }
+
+#[com_interface("FCE5EFA0-8BBA-4f8E-A036-8F2022B08466")]
+pub trait IMetaDataImport2: IMetaDataImport {
+    unsafe fn enum_generic_params(&self, ph_enum: *mut HCORENUM, tk: mdToken, r_generic_params: *mut mdGenericParam, c_max: ULONG, pc_generic_params: *mut ULONG) -> HRESULT;
+    unsafe fn get_generic_param_props(&self, gp: mdGenericParam, pul_param_seq: *mut ULONG, pdw_param_flags: *mut DWORD, pt_owner: *mut mdToken, reserved: *mut DWORD, wzname: LPWSTR, cch_name: ULONG, pch_name: *mut ULONG) -> HRESULT;
+    unsafe fn get_method_spec_props(&self, mi: mdMethodSpec, tk_parent: *mut mdToken, ppv_sig_blob: *mut PCCOR_SIGNATURE, pcb_sig_blob: *mut ULONG) -> HRESULT;
+    unsafe fn enum_generic_param_constraints(&self, ph_enum: *mut HCORENUM, tk: mdGenericParam, r_generic_param_constraints: *mut mdGenericParamConstraint, c_max: ULONG, pc_generic_param_constraints: *mut ULONG) -> HRESULT;
+    unsafe fn get_generic_param_constraint_props(&self, gpc: mdGenericParamConstraint, pt_generic_param: *mut mdGenericParam, ptk_constraint_type: *mut mdToken) -> HRESULT;
+    unsafe fn get_pekind(&self, pdw_pekind: *mut DWORD, pdw_machine: *mut DWORD) -> HRESULT;
+    unsafe fn get_version_string(&self, pwz_buf: LPWSTR, cc_buf_size: DWORD, pcc_buf_size: *mut DWORD) -> HRESULT;
+    unsafe fn enum_method_specs(&self, ph_enum: *mut HCORENUM, tk: mdToken, r_method_specs: *mut mdMethodSpec, c_max: ULONG, pc_method_specs: *mut ULONG) -> HRESULT;
+}

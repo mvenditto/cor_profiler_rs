@@ -15,6 +15,8 @@ pub trait IMethodMalloc: IUnknown {
     unsafe fn alloc(&self, cb: ULONG) -> PVOID;
 }
 
+type CorElementType = ULONG;
+
 #[com_interface("28B5557D-3F3F-48b4-90B2-5F9EEA2F6C48")]
 pub trait ICorProfilerInfo: IUnknown {
     unsafe fn get_class_from_object(&self, object_id: ObjectID, p_class_id: *mut ClassID) -> HRESULT;

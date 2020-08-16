@@ -43,7 +43,7 @@ pub type mdFile = mdToken;
 pub type mdExportedType = mdToken;
 pub type mdManifestResource = mdToken;
 pub type HCORENUM = *mut c_void;
-pub type CorElementType = ntdef::ULONG;
+// pub type CorElementType = ntdef::ULONG;
 pub type LPCBYTE = *const minwindef::BYTE;
 pub type LPBYTE = *mut minwindef::BYTE;
 pub type COR_SIGNATURE = minwindef::BYTE;
@@ -86,6 +86,8 @@ pub type INT8 = basetsd::INT8;
 pub type INT16 = basetsd::INT16;
 pub type INT32 = basetsd::INT32;
 pub type INT64 = basetsd::INT64;
+
+pub const mdTokenNil: mdToken = 0;
 
 pub const E_FAIL: HRESULT = 0x80004005i64 as HRESULT;
 pub const CORPROF_E_CLASSID_IS_ARRAY: HRESULT = 0x80131365i64 as HRESULT;

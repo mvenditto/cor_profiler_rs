@@ -4,4 +4,8 @@ cor_profiler/*.lib
 ILRewriter/ILRewriter.vcxproj.user
 ILRewriter/x64
 ILRewriter/.vs
+examples/*/*/bin
+examples/*/*/obj
+examples/*/*/.vs
+examples/environment_vars.json
 /.vscode

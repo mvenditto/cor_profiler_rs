@@ -107,3 +107,8 @@ INT8 __cdecl get_arg_8(C_ILInstr instr)
 {
     return instr->m_Arg8;
 }
+
+INT32 __cdecl get_arg_32(C_ILInstr instr) 
+{
+    return instr->m_Arg32;
+}

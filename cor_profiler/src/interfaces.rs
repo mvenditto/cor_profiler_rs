@@ -30,7 +30,10 @@ pub(crate) use i_cor_profiler_info::{
 };
 
 pub(crate) mod i_meta_data_import;
-pub(crate) use i_meta_data_import::IMetaDataImport;
+pub(crate) use i_meta_data_import::{
+    IMetaDataImport,
+    IMetaDataImport2
+};
 
 pub(crate) mod i_meta_data_emit;
 pub(crate) use i_meta_data_emit::{

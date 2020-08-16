@@ -8,8 +8,9 @@ pub(crate) mod cor_profiler;
 pub(crate) mod types;
 pub(crate) mod interfaces;
 pub(crate) mod metadata_helpers;
-pub(crate) mod cor_helpers;
+#[macro_use] pub(crate) mod cor_helpers;
 pub(crate) mod data_container;
+pub(crate) mod sig_parser;
 
 use cor_profiler::{
     CLSID_COR_PROFILER,

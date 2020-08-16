@@ -1,0 +1,17 @@
+- 
+  target:
+      assembly: System.Net.Http
+      type: System.Net.Http.HttpClient
+      method:
+          name: PrepareRequestMessage
+          return_type: void
+          argument_types:
+              - System.Net.Http.HttpRequestMessage
+  hook:
+      assembly: Helpers
+      type: Helpers.Class1
+      method:
+          name: HttpClientSendAsyncHook
+          return_type: void
+          argument_types:
+              - System.Net.Http.HttpRequestMessage

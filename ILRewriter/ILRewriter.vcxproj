@@ -138,12 +138,14 @@ copy /Y "$(TargetDir)$(ProjectName).dll" "$(SolutionDir)..\cor_profiler\target\d
     <ClInclude Include="ilrewriter.h" />
     <ClInclude Include="ilrewriter_wrapper.h" />
     <ClInclude Include="sigparse.h" />
+    <ClInclude Include="sigparse_wrapper.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="cor_helpers.cpp" />
     <ClCompile Include="ilrewriter.cpp" />
     <ClCompile Include="ilrewriter_wrapper.cpp" />
     <ClCompile Include="sigparse.cpp" />
+    <ClCompile Include="sigparse_wrapper.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

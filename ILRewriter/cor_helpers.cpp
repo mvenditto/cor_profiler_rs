@@ -13,3 +13,10 @@ COR_SIGNATURE* __cdecl cor_sig_compress_token_2(mdToken token, ULONG* compressed
     std::cout << "cor_sig_compress_token_2 length=" << compressed_tk_length << "\n";
     return &buff[0];
 }
+
+mdToken cor_sig_uncompress_token_2(COR_SIGNATURE* sig, ULONG* uncompressed_tk_length)
+{
+    mdToken token;
+    *uncompressed_tk_length = CorSigUncompressToken(sig, &token);
+    return token;
+}
