@@ -15,40 +15,36 @@ C_ICLRMetaHost __cdecl clr_create_meta_host(HRESULT* hr)
     return metahost;
 }
 
-HRESULT __cdecl clr_get_installed_runtimes(
-    C_ICLRMetaHost metahost, 
-    C_ICLRRuntimeInfo* installed_runtimes_out,
-    ULONG* installed_runtimes_length
+C_ICLRRuntimeInfo __cdecl clr_get_latest_installed_runtime(
+    C_ICLRMetaHost metahost, HRESULT* hr
 ) {
     try {
         auto _metahost = reinterpret_cast<ICLRMetaHost*>(metahost);
         IEnumUnknown* runtimes = nullptr;
-        auto hr = _metahost->EnumerateInstalledRuntimes(&runtimes);
-        if (hr < 0) return hr;
-        ICLRRuntimeInfo* curr_runtime = nullptr;
+        *hr = _metahost->EnumerateInstalledRuntimes(&runtimes);
+        if (hr < 0) return NULL;
+        ICLRRuntimeInfo* runtime = nullptr;
+        ICLRRuntimeInfo* latest_runtime = nullptr;
         ULONG fetched = 0;
-        std::vector<ICLRRuntimeInfo*>* vect = new std::vector<ICLRRuntimeInfo*>;
-        while ((hr = runtimes->Next(1, (IUnknown**)&curr_runtime, &fetched)) == S_OK && fetched > 0) {
-            ICLRRuntimeInfo* runtime = curr_runtime;
-            vect->push_back(runtime);
+        while ((*hr = runtimes->Next(1, (IUnknown**)&runtime, &fetched)) == S_OK && fetched > 0) {
+            latest_runtime = runtime;
         }
-        if (hr < 0) return hr;
-        installed_runtimes_out = (C_ICLRRuntimeInfo*)(&vect->at(0));
-        *installed_runtimes_length = (ULONG)vect->size();
-        return S_OK;
+        if (hr < 0) return NULL;
+        return latest_runtime;
     } catch (...){
-        return E_FAIL;
+        *hr = E_FAIL;
     }
+    return NULL;
 }
-/*
-HRESULT __cdecl clr_runtime_get_metadata_dispenser(C_ICLRRuntimeInfo* runtime, IMetaDataDispenser* metadata_dispenser_out) {
-    auto _runtime = reinterpret_cast<ICLRRuntimeInfo*>(runtime);
-    auto hr = _runtime->GetInterface(
-            CLSID_CorMetaDataDispenser, 
-            IID_IMetaDataDispenser,
-            (void**)&metadata_dispenser_out);
-    return hr;
-}*/
+
+const wchar_t* __cdecl clr_runtime_info_get_version_string(C_ICLRRuntimeInfo runtime_info, HRESULT* hr)
+{
+    auto _runtime_info = reinterpret_cast<ICLRRuntimeInfo*>(runtime_info);
+    LPWSTR buff = new WCHAR[2048];
+    DWORD bytes = 2048;
+    *hr = _runtime_info->GetVersionString(buff, &bytes);
+    return buff;
+}
 
 UINT __cdecl cor_sig_compress_token(mdToken token, void* out_buffer)
 {

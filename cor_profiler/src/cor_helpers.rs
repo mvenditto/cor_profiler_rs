@@ -9,11 +9,16 @@ use num_derive::ToPrimitive;
 use crate::types::{
     mdToken,
     mdTypeDef,
-    mdTypeRef,
     COR_SIGNATURE,
     ULONG,
-    ULONG32
+    LPWSTR,
+    LPCWSTR,
+    DWORD,
+    WCHAR
 };
+
+extern crate widestring;
+use widestring::{U16CString, U16String};
 
 use com::{
     ComPtr,
@@ -208,31 +213,45 @@ impl ICLRMetaHost {
         }
     }
 
-    pub fn get_installed_runtimes(self) -> Result<Vec<ICLRRuntimeInfo>, HRESULT> {
+    pub fn get_latest_installed_runtime(self) -> Result<ICLRRuntimeInfo, HRESULT> {
         unsafe {
-            let mut runtimes_len: ULONG = 0;
-            let mut runtimes: C_ICLRRuntimeInfo = ptr::null_mut();
-            let hr = clr_get_installed_runtimes(
-                self.native, runtimes, &mut runtimes_len);
-            if hr < 0 { return Err(hr); }
-            let ct: &[C_ICLRRuntimeInfo] = slice::from_raw_parts(
-                &runtimes, runtimes_len as usize);
-            let mut ret = 
-                Vec::with_capacity(runtimes_len as usize);
-            for x in ct {
-                ret.push(ICLRRuntimeInfo { native: *x});
+            let mut hr: HRESULT = 0;
+            let raw_ptr = clr_get_latest_installed_runtime(self.native, &mut hr);
+            if hr < 0 {
+                return Err(hr);
             }
-            info!("num runtimes={}", ret.len());
-            Ok(ret)
+            Ok(ICLRRuntimeInfo { native: raw_ptr })
         }
     }
+ }
+
+ #[cfg(windows)]     
+ fn from_wide_string(s: &[WCHAR]) -> String {         
+     use std::ffi::OsString;         
+    use std::os::windows::ffi::OsStringExt;         
+    let slice = s.split(|&v| v == 0).next().unwrap();         
+    OsString::from_wide(slice).to_string_lossy().into()     
+}
+
+ impl ICLRRuntimeInfo {
+     pub fn get_version_string(self) -> Result<String, HRESULT> {
+         unsafe {
+            let mut hr: HRESULT = 0;
+            let version: LPCWSTR = clr_runtime_info_get_version_string(self.native, &mut hr);
+            if hr < 0 { return Err(hr); }
+            let version_string = U16CString::from_ptr_str(version);
+            Ok(version_string.to_string_lossy())
+         }
+     }
  }
 
 #[link(name = "ILRewriter", kind="static")]
 extern {
     pub fn clr_create_meta_host(hr: *mut HRESULT) -> C_ICLRMetaHost;
 
-    pub fn clr_get_installed_runtimes(metahost: C_ICLRMetaHost, runtimes: C_ICLRRuntimeInfo, runtimes_len: *mut ULONG) -> HRESULT;
+    pub fn clr_get_latest_installed_runtime(metahost: C_ICLRMetaHost, hr: *mut HRESULT) -> C_ICLRRuntimeInfo;
+
+    pub fn clr_runtime_info_get_version_string(runtime_info: C_ICLRRuntimeInfo, hr: *mut HRESULT) -> LPCWSTR;
 
     pub fn cor_sig_compress_token(token: mdToken, out_buff: *mut c_void) -> ULONG;
 

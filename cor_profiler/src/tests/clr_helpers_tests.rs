@@ -17,15 +17,15 @@ fn test_clr_get_installed_runtimes() {
     let maybe_metahost = ICLRMetaHost::create();
     match maybe_metahost {
         Ok(metahost) => {
-            let maybe_installed_runtimes = metahost.get_installed_runtimes();
+            let maybe_installed_runtimes = metahost.get_latest_installed_runtime();
             if maybe_installed_runtimes.is_err() {
                 let hr = maybe_installed_runtimes.err().unwrap();
                 let msg = format!("Received error hr=0x{:x} from get_installed_runtimes()", hr);
                 assert!(false, msg);
             } else {
-                let runtimes = maybe_installed_runtimes.unwrap();
-                assert!(runtimes.len() > 0, "");
-                println!("num installed runtimes: {}", runtimes.len());
+                let runtime = maybe_installed_runtimes.unwrap();
+                let v = runtime.get_version_string().unwrap();
+                println!("runtime: {}", v);
             }
         },
         Err(hr) => {
