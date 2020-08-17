@@ -192,22 +192,47 @@ pub(crate) struct ICLRMetaHost {
     native: C_ICLRMetaHost
 }
 
+pub(crate) struct ICLRRuntimeInfo {
+    native: C_ICLRRuntimeInfo
+}
+
 impl ICLRMetaHost {
     pub fn create() -> Result<Self, HRESULT> {
         unsafe {
-            let mut meta_host_ptr: C_ICLRMetaHost = ptr::null_mut();
-            let hr = clr_create_meta_host(&mut meta_host_ptr);
+            let mut hr: HRESULT = 0;
+            let meta_host_ptr = clr_create_meta_host(&mut hr);
             if hr < 0 {
                 return Err(hr);
             }
             Ok(ICLRMetaHost { native: meta_host_ptr })
         }
     }
+
+    pub fn get_installed_runtimes(self) -> Result<Vec<ICLRRuntimeInfo>, HRESULT> {
+        unsafe {
+            let mut runtimes_len: ULONG = 0;
+            let mut runtimes: C_ICLRRuntimeInfo = ptr::null_mut();
+            let hr = clr_get_installed_runtimes(
+                self.native, runtimes, &mut runtimes_len);
+            if hr < 0 { return Err(hr); }
+            let ct: &[C_ICLRRuntimeInfo] = slice::from_raw_parts(
+                &runtimes, runtimes_len as usize);
+            let mut ret = 
+                Vec::with_capacity(runtimes_len as usize);
+            for x in ct {
+                ret.push(ICLRRuntimeInfo { native: *x});
+            }
+            info!("num runtimes={}", ret.len());
+            Ok(ret)
+        }
+    }
  }
 
 #[link(name = "ILRewriter", kind="static")]
 extern {
-    pub fn clr_create_meta_host(out_meta_host: *mut C_ICLRMetaHost) -> HRESULT;
+    pub fn clr_create_meta_host(hr: *mut HRESULT) -> C_ICLRMetaHost;
+
+    pub fn clr_get_installed_runtimes(metahost: C_ICLRMetaHost, runtimes: C_ICLRRuntimeInfo, runtimes_len: *mut ULONG) -> HRESULT;
 
     pub fn cor_sig_compress_token(token: mdToken, out_buff: *mut c_void) -> ULONG;
 
