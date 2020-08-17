@@ -4,9 +4,21 @@
 
 HRESULT __cdecl clr_create_meta_host(C_ICLRMetaHost* out_metahost)
 {
+    HMODULE hMscoree = LoadLibraryA("mscoree.dll");
+    CLRCreateInstanceFnPtr CLRCreateInstance;
+
+    if (hMscoree == NULL)
+        return E_FAIL;
+
+    CLRCreateInstance = (CLRCreateInstanceFnPtr)GetProcAddress(hMscoree, "CLRCreateInstance");
+
+    if (CLRCreateInstance == NULL)
+        return E_FAIL;
+
     return CLRCreateInstance(CLSID_CLRMetaHost, IID_ICLRMetaHost, (void**)&out_metahost);
 }
 
+/*
 HRESULT __cdecl clr_get_installed_runtimes(
     C_ICLRMetaHost metahost, 
     C_ICLRRuntimeInfo* installed_runtimes_out,
@@ -32,7 +44,7 @@ HRESULT __cdecl clr_runtime_get_metadata_dispenser(C_ICLRRuntimeInfo* runtime, I
             IID_IMetaDataDispenser,
             (void**)&metadata_dispenser_out);
     return hr;
-}
+}*/
 
 UINT __cdecl cor_sig_compress_token(mdToken token, void* out_buffer)
 {

@@ -2,7 +2,7 @@
 #![allow(dead_code)]
 #[macro_use]
 
-use std::{slice, ffi::c_void};
+use std::{slice, ffi::c_void, ptr};
 use num_derive::FromPrimitive;
 use num_derive::ToPrimitive; 
 
@@ -13,6 +13,11 @@ use crate::types::{
     COR_SIGNATURE,
     ULONG,
     ULONG32
+};
+
+use com::{
+    ComPtr,
+    sys::HRESULT
 };
 
 pub(crate) struct CorSignature {
@@ -180,8 +185,30 @@ pub(crate) enum CorTokenType
     mdtBaseType             = 0x72000000,       // Leave this on the high end value. This does not correspond to metadata table
 }
 
+type C_ICLRMetaHost = *mut c_void;
+type C_ICLRRuntimeInfo = *mut c_void;
+
+pub(crate) struct ICLRMetaHost {
+    native: C_ICLRMetaHost
+}
+
+impl ICLRMetaHost {
+    pub fn create() -> Result<Self, HRESULT> {
+        unsafe {
+            let mut meta_host_ptr: C_ICLRMetaHost = ptr::null_mut();
+            let hr = clr_create_meta_host(&mut meta_host_ptr);
+            if hr < 0 {
+                return Err(hr);
+            }
+            Ok(ICLRMetaHost { native: meta_host_ptr })
+        }
+    }
+ }
+
 #[link(name = "ILRewriter", kind="static")]
 extern {
+    pub fn clr_create_meta_host(out_meta_host: *mut C_ICLRMetaHost) -> HRESULT;
+
     pub fn cor_sig_compress_token(token: mdToken, out_buff: *mut c_void) -> ULONG;
 
     pub fn cor_sig_compress_token_2(token: mdToken, compressed_tk_len: *mut ULONG) -> *mut COR_SIGNATURE;

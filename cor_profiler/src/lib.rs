@@ -12,6 +12,7 @@ pub(crate) mod metadata_helpers;
 pub(crate) mod data_container;
 pub(crate) mod sig_parser;
 pub(crate) mod hooks_loader;
+mod tests;
 
 use cor_profiler::{
     CLSID_COR_PROFILER,
