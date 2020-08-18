@@ -76,6 +76,7 @@ pub type BOOL = ntdef::INT;
 pub type BYTE = minwindef::BYTE;
 pub type INT = ntdef::INT;
 pub type GUID = guiddef::GUID;
+pub type REFCLSID = guiddef::REFCLSID;
 pub type REFGUID = guiddef::REFGUID;
 pub type HANDLE = ntdef::HANDLE;
 pub type REFIID = guiddef::REFIID;

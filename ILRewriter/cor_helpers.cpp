@@ -46,6 +46,14 @@ const wchar_t* __cdecl clr_runtime_info_get_version_string(C_ICLRRuntimeInfo run
     return buff;
 }
 
+IMetaDataDispenser* clr_runtime_get_metadata_dispenser(C_ICLRRuntimeInfo runtime_info, HRESULT* hr)
+{
+    auto _runtime_info = reinterpret_cast<ICLRRuntimeInfo*>(runtime_info);
+    IMetaDataDispenser* metadata_dispenser = nullptr;
+    *hr = _runtime_info->GetInterface(CLSID_CorMetaDataDispenser, IID_IMetaDataDispenser, (void**)&metadata_dispenser);
+    return metadata_dispenser;
+}
+
 UINT __cdecl cor_sig_compress_token(mdToken token, void* out_buffer)
 {
     return CorSigCompressToken(token, out_buffer);

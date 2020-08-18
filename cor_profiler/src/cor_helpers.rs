@@ -22,8 +22,11 @@ use widestring::{U16CString, U16String};
 
 use com::{
     ComPtr,
+    ComRc,
     sys::HRESULT
 };
+
+use crate::interfaces::IMetaDataDispenser;
 
 pub(crate) struct CorSignature {
     arguments: Vec<COR_SIGNATURE>
@@ -197,6 +200,7 @@ pub(crate) struct ICLRMetaHost {
     native: C_ICLRMetaHost
 }
 
+//#[derive(Copy)]
 pub(crate) struct ICLRRuntimeInfo {
     native: C_ICLRRuntimeInfo
 }
@@ -213,7 +217,7 @@ impl ICLRMetaHost {
         }
     }
 
-    pub fn get_latest_installed_runtime(self) -> Result<ICLRRuntimeInfo, HRESULT> {
+    pub fn get_latest_installed_runtime(&self) -> Result<ICLRRuntimeInfo, HRESULT> {
         unsafe {
             let mut hr: HRESULT = 0;
             let raw_ptr = clr_get_latest_installed_runtime(self.native, &mut hr);
@@ -234,7 +238,7 @@ impl ICLRMetaHost {
 }
 
  impl ICLRRuntimeInfo {
-     pub fn get_version_string(self) -> Result<String, HRESULT> {
+     pub fn get_version_string(&self) -> Result<String, HRESULT> {
          unsafe {
             let mut hr: HRESULT = 0;
             let version: LPCWSTR = clr_runtime_info_get_version_string(self.native, &mut hr);
@@ -242,6 +246,15 @@ impl ICLRMetaHost {
             let version_string = U16CString::from_ptr_str(version);
             Ok(version_string.to_string_lossy())
          }
+     }
+
+     pub fn get_metadata_dispenser(&self) -> Result<ComRc<dyn IMetaDataDispenser>,HRESULT> {
+        unsafe {
+            let mut hr: HRESULT = 0;
+            let unkn = clr_runtime_get_metadata_dispenser(self.native, &mut hr);
+            if hr < 0 { return Err(hr); }
+            Ok(ComPtr::<dyn IMetaDataDispenser>::new(unkn as *mut _).upgrade())
+        }
      }
  }
 
@@ -252,6 +265,8 @@ extern {
     pub fn clr_get_latest_installed_runtime(metahost: C_ICLRMetaHost, hr: *mut HRESULT) -> C_ICLRRuntimeInfo;
 
     pub fn clr_runtime_info_get_version_string(runtime_info: C_ICLRRuntimeInfo, hr: *mut HRESULT) -> LPCWSTR;
+
+    pub fn clr_runtime_get_metadata_dispenser(runtime_info: C_ICLRRuntimeInfo, hr: *mut HRESULT) -> *mut c_void;
 
     pub fn cor_sig_compress_token(token: mdToken, out_buff: *mut c_void) -> ULONG;
 

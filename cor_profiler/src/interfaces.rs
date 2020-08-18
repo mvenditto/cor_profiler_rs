@@ -41,6 +41,9 @@ pub(crate) use i_meta_data_emit::{
     IMetaDataEmit2
 };
 
+pub(crate) mod i_meta_data_dispenser;
+pub(crate) use i_meta_data_dispenser::IMetaDataDispenser;
+
 pub(crate) mod i_meta_data_assembly_emit;
 pub(crate) use i_meta_data_assembly_emit::{
     IMetaDataAssemblyEmit

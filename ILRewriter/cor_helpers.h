@@ -14,6 +14,8 @@ extern "C" {
 
     __declspec(dllexport) const wchar_t* clr_runtime_info_get_version_string(C_ICLRRuntimeInfo runtime_info, HRESULT* hr);
 
+    __declspec(dllexport) IMetaDataDispenser* clr_runtime_get_metadata_dispenser(C_ICLRRuntimeInfo runtime_info, HRESULT* hr);
+
 	__declspec(dllexport) UINT cor_sig_compress_token(
         mdToken token, void* out_buffer);
 
