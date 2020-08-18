@@ -233,7 +233,7 @@ impl Drop for ILRewriter {
 type C_ILRewriter = *mut c_void;
 type C_ILInstr = *mut c_void;
 
-#[link(name = "ILRewriter", kind="static")]
+#[link(name = "Native", kind="static")]
 extern {
     #[allow(improper_ctypes)]
     pub fn new_il_rewriter(

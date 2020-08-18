@@ -258,7 +258,7 @@ impl ICLRMetaHost {
      }
  }
 
-#[link(name = "ILRewriter", kind="static")]
+#[link(name = "Native", kind="static")]
 extern {
     pub fn clr_create_meta_host(hr: *mut HRESULT) -> C_ICLRMetaHost;
 

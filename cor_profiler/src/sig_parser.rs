@@ -6,7 +6,7 @@ use crate::types::{
     ULONG
 };
 
-#[link(name = "ILRewriter", kind="static")]
+#[link(name = "Native", kind="static")]
 extern {
     pub fn parse_signature(callbacks: *mut c_void, signature: PCCOR_SIGNATURE, sig_size: ULONG) -> HRESULT;
 }
