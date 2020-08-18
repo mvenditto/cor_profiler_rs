@@ -11,17 +11,24 @@ env:
 
 jobs:
   build:
-
     runs-on: windows-latest
-
+    env:
+      DOTNET_NOLOGO: true
     steps:
     - name: Add msbuild to PATH
       uses: microsoft/setup-msbuild@v1.0.1
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '3.1.14'
     - uses: actions/checkout@v2
     - name: Build Native.lib
       run: |
+        Get-ChildItem "C:\Program Files\dotnet\shared\Microsoft.NETCore.App"
         MSBuild .\NativeWrapper\Native.vcxproj /property:Configuration=Debug /property:Platform=x64
         Copy-Item ".\NativeWrapper\x64\Debug\Native.lib" -Destination ".\cor_profiler"
     - name: Build
-      run: cargo build --manifest-path .\cor_profiler\Cargo.toml --verbose
+      run: |
+        cargo build --manifest-path .\cor_profiler\Cargo.toml --verbose
+        Copy-Item ".\NativeWrapper\x64\Debug\Native.dll" -Destination ".\cor_profiler\target\debug"
     
