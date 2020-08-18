@@ -15,7 +15,7 @@ jobs:
     env:
       DOTNET_NOLOGO: true
     steps:
-    - name: Add msbuild to PATH
+    - name: Add MSBuild to PATH
       uses: microsoft/setup-msbuild@v1.0.1
     - name: Setup .NET
       uses: actions/setup-dotnet@v1
@@ -24,12 +24,15 @@ jobs:
     - uses: actions/checkout@v2
     - name: Build Native.lib
       run: |
-        if(Test-Path "C:\Windows\Microsoft.NET\" -PathType Container) { Get-ChildItem "C:\Windows\Microsoft.NET\" } else {Write-Host "not exists"}
-        Get-ChildItem "C:\Program Files\dotnet\shared\Microsoft.NETCore.App"
         MSBuild .\NativeWrapper\Native.vcxproj /property:Configuration=Debug /property:Platform=x64
         Copy-Item ".\NativeWrapper\x64\Debug\Native.lib" -Destination ".\cor_profiler"
     - name: Build
       run: |
         cargo build --manifest-path .\cor_profiler\Cargo.toml --verbose
         Copy-Item ".\NativeWrapper\x64\Debug\Native.dll" -Destination ".\cor_profiler\target\debug"
+    - name: Run tests
+      run: |
+        Get-ChildItem "C:\Windows\Microsoft.NET\Framework"
+        Get-ChildItem "C:\Program Files\dotnet\shared\Microsoft.NETCore.App"
+        cargo test --verbose --manifest-path .\cor_profiler\Cargo.toml -- --nocapture
     
