@@ -20,7 +20,7 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v1
       with:
-        dotnet-version: '3.1.14'
+        dotnet-version: '3.1.4'
     - uses: actions/checkout@v2
     - name: Build Native.lib
       run: |
