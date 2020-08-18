@@ -21,7 +21,7 @@ jobs:
     - name: Build Native.lib
       run: |
         MSBuild .\NativeWrapper\Native.vcxproj
-        copy \Y ".\NativeWrapper\Debug\Native.lib" ".\cor_profiler\Native.lib"
+        Copy-Item ".\NativeWrapper\Debug\Native.lib" -Destination ".\cor_profiler"
     - name: Build
       run: cargo build --manifest-path .\cor_profiler\Cargo.toml --verbose
     
