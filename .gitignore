@@ -1,9 +1,9 @@
 cor_profiler/target
 cor_profiler/Cargo.lock
 cor_profiler/*.lib
-ILRewriter/ILRewriter.vcxproj.user
-ILRewriter/x64
-ILRewriter/.vs
+NativeWrapper/Native.vcxproj.user
+NativeWrapper/x64
+NativeWrapper/.vs
 examples/*/*/bin
 examples/*/*/obj
 examples/*/*/.vs
