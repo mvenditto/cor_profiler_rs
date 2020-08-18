@@ -15,8 +15,9 @@ jobs:
     runs-on: windows-latest
 
     steps:
+    - name: Add msbuild to PATH
+      uses: microsoft/setup-msbuild@v1.0.1
     - uses: actions/checkout@v2
-    - name: Build
-      run: cargo build --manifest-path .\cor_profiler\Cargo.toml --verbose
-    - name: Run tests
-      run: cargo test --verbose --manifest-path .\cor_profiler\Cargo.toml -- --nocapture
+    - name: Build Native.lib
+      run: MSBuild .\NativeWrapper\Native.vcxproj  
+    
