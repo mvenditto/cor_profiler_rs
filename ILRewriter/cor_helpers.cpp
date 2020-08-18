@@ -63,7 +63,6 @@ COR_SIGNATURE* __cdecl cor_sig_compress_token_2(mdToken token, ULONG* compressed
 {
     auto buff = new COR_SIGNATURE[4];
     *compressed_tk_length = CorSigCompressToken(token, (void*)(&buff[0]));
-    std::cout << "cor_sig_compress_token_2 length=" << compressed_tk_length << "\n";
     return &buff[0];
 }
 
