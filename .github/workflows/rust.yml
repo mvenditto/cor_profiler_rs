@@ -20,10 +20,11 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v1
       with:
-        dotnet-version: '3.1.4'
+        dotnet-version: '3.1.401'
     - uses: actions/checkout@v2
     - name: Build Native.lib
       run: |
+        if(Test-Path "C:\Windows\Microsoft.NET\" -PathType Container) { Get-ChildItem "C:\Windows\Microsoft.NET\" } else {Write-Host "not exists"}
         Get-ChildItem "C:\Program Files\dotnet\shared\Microsoft.NETCore.App"
         MSBuild .\NativeWrapper\Native.vcxproj /property:Configuration=Debug /property:Platform=x64
         Copy-Item ".\NativeWrapper\x64\Debug\Native.lib" -Destination ".\cor_profiler"
