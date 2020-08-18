@@ -19,5 +19,9 @@ jobs:
       uses: microsoft/setup-msbuild@v1.0.1
     - uses: actions/checkout@v2
     - name: Build Native.lib
-      run: MSBuild .\NativeWrapper\Native.vcxproj  
+      run: |
+        MSBuild .\NativeWrapper\Native.vcxproj
+        copy \Y .\NativeWrapper\Debug\Native.lib .\cor_profiler\Native.lib
+    - name: Build
+      run: cargo build --manifest-path .\cor_profiler\Cargo.toml --verbose
     
