@@ -21,7 +21,7 @@ jobs:
     - name: Build Native.lib
       run: |
         MSBuild .\NativeWrapper\Native.vcxproj /property:Configuration=Debug /property:Platform=x64
-        Copy-Item ".\x64\NativeWrapper\Debug\Native.lib" -Destination ".\cor_profiler"
+        Copy-Item ".\NativeWrapper\x64\Debug\Native.lib" -Destination ".\cor_profiler"
     - name: Build
       run: cargo build --manifest-path .\cor_profiler\Cargo.toml --verbose
     
