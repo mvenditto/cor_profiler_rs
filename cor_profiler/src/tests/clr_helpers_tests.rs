@@ -2,9 +2,20 @@ use crate::cor_helpers::{
     ICLRMetaHost
 };
 
-use crate::types::ofReadWriteMask;
+use crate::types::{
+    ofReadWriteMask,
+    mdToken
+};
 
-use crate::interfaces::i_meta_data_dispenser::IMetaDataDispenser;
+use crate::interfaces::{
+    IMetaDataDispenser,
+    IMetaDataImport2
+};
+
+use crate::metadata_helpers::{
+    get_type_info,
+    TypeInfo
+};
 
 use std::{
     ptr,
@@ -13,7 +24,13 @@ use std::{
 
 use crate::guids::IID_IMetaDataImport2;
 use crate::utils::to_widestring;
-use com::sys::{HRESULT, S_OK};
+
+use com::{
+    ComPtr,
+    ComRc,
+    interfaces::IUnknown,
+    sys::{HRESULT, S_OK}
+};
 
 fn unwrap_or_fail<T>(r: Result<T, HRESULT>, msg: &str) -> T {
     match r {
@@ -24,6 +41,18 @@ fn unwrap_or_fail<T>(r: Result<T, HRESULT>, msg: &str) -> T {
             panic!("");
         }
         Ok(val) => val
+    }
+}
+
+fn unwrap_or_fail_opt<T>(r: Option<T>, msg: &str) -> T {
+    match r {
+        None => {
+            let err_lbl = format!("Couldn't get value for {}", msg);
+            let assert_msg = msg.to_string() + &err_lbl;
+            assert!(false, assert_msg);
+            panic!("");
+        }
+        Some(val) => val
     }
 }
 
@@ -88,7 +117,7 @@ fn test_clr_metadata_dispenser_open_scope() {
 
     let scope = r#"C:\Windows\Microsoft.NET\Framework\"#.to_string() 
             + &runtime_version 
-            + r#"\mscorlib.dll"#;
+            + r#"\System.Net.Http.dll"#;
     
     let metadata_dispenser = unwrap_or_fail(
         runtime.get_metadata_dispenser(),
@@ -97,15 +126,33 @@ fn test_clr_metadata_dispenser_open_scope() {
 
     println!("\topen scope: {}", scope);
     let scope_name = to_widestring(&scope);
-     
+
     unsafe {
-        let mut unk: *mut c_void = ptr::null_mut();
+        let mut unkn: *mut c_void = ptr::null_mut();
         let hr = metadata_dispenser.open_scope(
             scope_name.as_ptr(), 
             ofReadWriteMask, 
             &IID_IMetaDataImport2, 
-            &mut unk);
+            &mut unkn);
         assert!(hr == S_OK, format!("failed to open {} metadata hr=0x{:x}",scope, hr));
+
+        let iunk = 
+            ComPtr::<dyn IUnknown>::new(unkn as *mut _).upgrade();
+
+        let metadata_import =  unwrap_or_fail_opt(
+            iunk.get_interface::<dyn IMetaDataImport2>(),
+            "IMetaDataImport"
+        );
+
+        let http_client_token: mdToken = 0x02000012;
+
+        let type_info = unwrap_or_fail(
+            get_type_info(&metadata_import, http_client_token),
+            &format!("Failed to retrieve TypeInfo for 0x{:x}", http_client_token),
+        );
+
+        assert_eq!("System.Net.Http.HttpClient", type_info.type_name);
+
     }
 
 }
