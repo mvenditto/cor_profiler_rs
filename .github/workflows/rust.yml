@@ -30,6 +30,8 @@ jobs:
       run: |
         cargo build --manifest-path .\cor_profiler\Cargo.toml --verbose
         Copy-Item ".\NativeWrapper\x64\Debug\Native.dll" -Destination ".\cor_profiler\target\debug"
+    - name: Build SampleLibrary
+      run: dotnet build ".\examples\SampleLibrary\SampleLibrary.sln"
     - name: Run tests
       run: |
         Get-ChildItem "C:\Windows\Microsoft.NET\Framework"
