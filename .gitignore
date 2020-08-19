@@ -3,9 +3,11 @@ cor_profiler/Cargo.lock
 cor_profiler/*.lib
 NativeWrapper/Native.vcxproj.user
 NativeWrapper/x64
+NativeWrapper/Debug
 NativeWrapper/.vs
 examples/*/*/bin
 examples/*/*/obj
 examples/*/*/.vs
+examples/*/.vs
 examples/environment_vars.json
 /.vscode

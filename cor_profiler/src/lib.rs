@@ -25,6 +25,9 @@ use std::ffi::c_void;
 #[macro_use] extern crate log;
 extern crate env_logger;
 
+#[macro_use]
+extern crate lazy_static;
+
 extern crate com;
 use com::runtime::init_runtime;
 

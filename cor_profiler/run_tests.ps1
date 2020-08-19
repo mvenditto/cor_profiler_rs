@@ -3,9 +3,10 @@ param (
     [switch]$run_all_tests = $false
 )
 
+$env:RUST_LOG="debug"
 
 if($run_all_tests -or -not $test_name) {
-    $cmd_args = @('test', '--', '--nocapture')
+    $cmd_args = @('test', '--', '--nocapture', '--test-threads=1')
     & 'cargo' $cmd_args
 } else {
     $cmd_args = @('test', '--', '--nocapture', $test_name)
