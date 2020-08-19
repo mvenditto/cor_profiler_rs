@@ -116,17 +116,34 @@ fn init() {
 }
 
 #[test]
-pub fn enum_assembly_refs_test_1() {
+pub fn should_find_assembly_ref() {
     init();
-    
-
     METADATA.with(|md|{
 
         let metadata_assembly_import = md.metadata_assembly_import();
 
-        unwrap_or_fail(
+        let result = unwrap_or_fail(
             enum_assembly_refs(&metadata_assembly_import,"netstandard"),
-            "netstandard.dll should be referenced");
+            "should not return Error");
+
+        assert!(result.is_some(), "netstandard.dll should be referenced");
+
+        unsafe { metadata_assembly_import.release(); }
+    });
+}
+
+#[test]
+pub fn should_not_find_assembly_ref() {
+    init();
+    METADATA.with(|md|{
+
+        let metadata_assembly_import = md.metadata_assembly_import();
+
+        let result = unwrap_or_fail(
+            enum_assembly_refs(&metadata_assembly_import,"System.Net.Http"),
+            "should not return Error");
+
+        assert!(result.is_none(), "System.Net.Http.dll should NOT be referenced");
 
         unsafe { metadata_assembly_import.release(); }
     });

@@ -17,7 +17,7 @@ use com::{
     ComRc,
     ComPtr,
     ComInterface,
-    sys::{HRESULT, S_OK}
+    sys::{HRESULT, S_OK, S_FALSE}
 };
 
 use std::{
@@ -350,6 +350,10 @@ pub fn enum_assembly_refs(
                 &mut num_tokens
             );
 
+            if (hr == S_FALSE) {
+                return Ok(None);
+            }
+
             for i in 0..num_tokens {
 
                 hr = metadata_assembly_import.get_assembly_ref_props(
@@ -369,7 +373,9 @@ pub fn enum_assembly_refs(
                     U16String::from_ptr(
                         assembly_name_buffer.as_mut_ptr() as LPWSTR, 
                     (num_chars - 1) as usize).to_string_lossy();
+
                 info!("assemblyRef: {}", native);
+
                 if native == type_name {
                     metadata_assembly_import.close_enum(assembly_refs_enum);
                     return Ok(Some(assembly_buff[i as usize]))
