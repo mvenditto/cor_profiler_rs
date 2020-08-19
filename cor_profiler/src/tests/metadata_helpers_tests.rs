@@ -50,13 +50,15 @@ unsafe impl Sync for MetaData { }
 
 impl MetaData {
     fn metadata_assembly_import(&self) -> ComRc<dyn IMetaDataAssemblyImport> {
-        let x = self.metadata_assembly_import.borrow();
-        return ComRc::clone(x.as_ref().unwrap());
+        match self.metadata_assembly_import.borrow().as_ref() {
+            Some(i) => ComRc::clone(&i),
+            _ => panic!()
+        }
     }
 }
 
-lazy_static! {
-    static ref METADATA: MetaData = MetaData {
+thread_local! {
+    static METADATA: MetaData = MetaData {
         metadata_import: RefCell::new(None),
         metadata_assembly_import: RefCell::new(None)
     };
@@ -97,20 +99,15 @@ fn setup() {
         let metadata_assembly_import = 
             iunk.get_interface::<dyn IMetaDataAssemblyImport>().unwrap();
 
-        METADATA.metadata_import.replace(Some(metadata_import));
-        METADATA.metadata_assembly_import.replace(Some(metadata_assembly_import));
+        METADATA.with(|md|{
+            md.metadata_import.replace(Some(metadata_import));
+        });
+
+        METADATA.with(|md|{
+            md.metadata_assembly_import.replace(Some(metadata_assembly_import));
+        });
 
         metadata_dispenser.release();
-    }
-}
-
-#[cfg(test)]
-#[ctor::dtor]
-fn teardown() {
-    info!("do teardown()");
-    unsafe {
-        METADATA.metadata_import.borrow().as_ref().unwrap().release();
-        METADATA.metadata_assembly_import.borrow().as_ref().unwrap().release();
     }
 }
 
@@ -121,9 +118,16 @@ fn init() {
 #[test]
 pub fn enum_assembly_refs_test_1() {
     init();
-    let metadata_assembly_import = METADATA.metadata_assembly_import();
+    
 
-    unwrap_or_fail(
-        enum_assembly_refs(&metadata_assembly_import,"netstandard"),
-        "netstandard.dll should be referenced");
+    METADATA.with(|md|{
+
+        let metadata_assembly_import = md.metadata_assembly_import();
+
+        unwrap_or_fail(
+            enum_assembly_refs(&metadata_assembly_import,"netstandard"),
+            "netstandard.dll should be referenced");
+
+        unsafe { metadata_assembly_import.release(); }
+    });
 }
