@@ -3,20 +3,19 @@ use crate::cor_helpers::{
 };
 
 use crate::types::{
-    ofReadWriteMask,
-    mdToken
+    ofReadWriteMask, REFIID
 };
 
 use crate::interfaces::{
     IMetaDataDispenser,
+    IMetaDataImport,
     IMetaDataImport2,
     IMetaDataAssemblyImport
 };
 
 use crate::metadata_helpers::{
-    get_type_info,
-    TypeInfo,
-    enum_assembly_refs
+    enum_assembly_refs,
+    enum_type_refs
 };
 
 use std::{
@@ -30,6 +29,7 @@ use crate::tests::common::unwrap_or_fail;
 
 use com::{
     ComPtr,
+    ComInterface,
     ComRc,
     interfaces::IUnknown,
     sys::{HRESULT, S_OK}
@@ -51,6 +51,13 @@ unsafe impl Sync for MetaData { }
 impl MetaData {
     fn metadata_assembly_import(&self) -> ComRc<dyn IMetaDataAssemblyImport> {
         match self.metadata_assembly_import.borrow().as_ref() {
+            Some(i) => ComRc::clone(&i),
+            _ => panic!()
+        }
+    }
+
+    fn metadata_import(&self) -> ComRc<dyn IMetaDataImport2> {
+        match self.metadata_import.borrow().as_ref() {
             Some(i) => ComRc::clone(&i),
             _ => panic!()
         }
@@ -146,5 +153,41 @@ pub fn should_not_find_assembly_ref() {
         assert!(result.is_none(), "System.Net.Http.dll should NOT be referenced");
 
         unsafe { metadata_assembly_import.release(); }
+    });
+}
+
+#[test]
+pub fn should_find_type_ref() {
+    init();
+    METADATA.with(|md|{
+
+        let metadata_import = md.metadata_import()
+            .get_interface::<dyn IMetaDataImport>().unwrap();
+
+        let result = unwrap_or_fail(
+            enum_type_refs(&metadata_import, "System.Object"),
+            "should not return Error");
+
+        assert!(result.is_some(), "System.Object should be referenced");
+
+        unsafe { metadata_import.release(); }
+    });
+}
+
+#[test]
+pub fn should_not_find_type_ref() {
+    init();
+    METADATA.with(|md|{
+
+        let metadata_import = md.metadata_import()
+            .get_interface::<dyn IMetaDataImport>().unwrap();
+
+        let result = unwrap_or_fail(
+            enum_type_refs(&metadata_import, "System.Net.Http.HttpClient"),
+            "should not return Error");
+
+        assert!(result.is_none(), "System.Net.Http.dll should NOT be referenced");
+
+        unsafe { metadata_import.release(); }
     });
 }

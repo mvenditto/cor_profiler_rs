@@ -293,6 +293,10 @@ pub fn enum_type_refs(
                 &mut num_tokens
             );
 
+            if hr == S_FALSE {
+                return Ok(None);
+            }
+
             for i in 0..num_tokens {
 
                 hr = metadata_import.get_type_ref_props(
@@ -307,7 +311,7 @@ pub fn enum_type_refs(
                     U16String::from_ptr(
                       type_def_name_buffer.as_mut_ptr() as LPWSTR, 
                     (num_chars - 1) as usize).to_string_lossy();
-                info!("typeRef: {}", native);
+                debug!("typeRef: {}", native);
                 if native == type_name {
                     metadata_import.close_enum(type_refs_enum);
                     return Ok(Some(type_refs_buff[i as usize]))
@@ -350,7 +354,7 @@ pub fn enum_assembly_refs(
                 &mut num_tokens
             );
 
-            if (hr == S_FALSE) {
+            if hr == S_FALSE {
                 return Ok(None);
             }
 
