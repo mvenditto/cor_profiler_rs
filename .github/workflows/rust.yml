@@ -36,5 +36,5 @@ jobs:
       run: |
         Get-ChildItem "C:\Windows\Microsoft.NET\Framework"
         Get-ChildItem "C:\Program Files\dotnet\shared\Microsoft.NETCore.App"
-        cargo test --verbose --manifest-path .\cor_profiler\Cargo.toml -- --nocapture
+        cargo test --verbose --manifest-path .\cor_profiler\Cargo.toml -- --nocapture --test-threads=1
     
