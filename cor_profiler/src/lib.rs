@@ -2,13 +2,13 @@
 #![allow(non_snake_case)]
 
 pub(crate) mod guids;
-#[macro_use] pub(crate) mod il_rewriter;
+#[macro_use] pub(crate) mod cor_helpers;
+pub(crate) mod il_rewriter;
 pub(crate) mod opcodes;
 pub(crate) mod cor_profiler;
 pub(crate) mod types;
 pub(crate) mod interfaces;
 pub(crate) mod metadata_helpers;
-#[macro_use] pub(crate) mod cor_helpers;
 pub(crate) mod data_container;
 pub(crate) mod sig_parser;
 pub(crate) mod hooks_loader;
@@ -24,9 +24,6 @@ use std::ffi::c_void;
 
 #[macro_use] extern crate log;
 extern crate env_logger;
-
-#[macro_use]
-extern crate lazy_static;
 
 extern crate com;
 use com::runtime::init_runtime;

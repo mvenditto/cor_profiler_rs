@@ -17,7 +17,11 @@ use com::{
     ComRc,
     ComPtr,
     ComInterface,
-    sys::{HRESULT, S_OK, S_FALSE}
+    sys::{
+        HRESULT,
+        S_OK, 
+        S_FALSE
+    }
 };
 
 use std::{
@@ -34,7 +38,11 @@ use crate::cor_helpers::{
     CorElementType::*,
     CorTokenType,
     CorTokenType::*,
-    cor_sig_uncompress_token_2
+    cor_sig_uncompress_token_2,
+    CorTypeAttr::{
+        tdVisibilityMask,
+        tdNestedPublic
+    }
 };
 
 extern crate widestring;
@@ -48,12 +56,20 @@ use crate::guids::{
     IID_IMetaDataEmit
 };
 
+use crate::utils::to_widestring;
+
 
 use num_traits::FromPrimitive;
 
 macro_rules! is_fail {
     ($x:expr) => {
         $x < 0;
+    }
+}
+
+macro_rules! is_success {
+    ($x:expr) => {
+        $x == 0;
     }
 }
 
@@ -84,7 +100,8 @@ pub struct FunctionFullNameInfo {
 
 pub struct TypeInfo {
     pub type_name: String,
-    pub metadata_token: mdToken
+    pub metadata_token: mdToken,
+    pub parent_token: mdToken
 }
 
 impl fmt::Display for FunctionFullNameInfo {
@@ -506,13 +523,6 @@ pub fn new_user_string<T: ICorProfilerInfo2 + ComInterface + ?Sized>(info: & Com
     Ok(token)
 } 
 
-// #define TypeFromToken(tk) ((ULONG32)((tk) & 0xff000000))
-macro_rules! type_from_token {
-    ($tk:expr) => {
-        ($tk as ULONG32) & 0xff000000;
-    }
-}
-
 pub fn get_type_info(metadata_import: &ComRc<dyn IMetaDataImport2>, token: mdToken) -> Result<TypeInfo,HRESULT> {
 
     let mut parent_token: mdToken = mdTokenNil;
@@ -527,8 +537,15 @@ pub fn get_type_info(metadata_import: &ComRc<dyn IMetaDataImport2>, token: mdTok
     unsafe {
         match token_type {
             mdtTypeDef => {
+                let mut flags: DWORD = 0;
+                
                 hr = metadata_import.get_type_def_props(
-                    token, wstr, 256, &mut type_name_len, ptr::null_mut(), ptr::null_mut());
+                    token, wstr, 256, &mut type_name_len, &mut flags, ptr::null_mut());
+                
+                if is_td_nested!(flags) {
+                    let hr2 = metadata_import.get_nested_class_props(token, &mut parent_token);
+                    if is_success!(hr) && is_fail!(hr2){ hr = hr2; }
+                }
             },
             mdtTypeRef => {
                 hr = metadata_import.get_type_ref_props(
@@ -576,7 +593,11 @@ pub fn get_type_info(metadata_import: &ComRc<dyn IMetaDataImport2>, token: mdTok
         let type_name  = 
             U16String::from_ptr(wstr, (type_name_len-1) as usize).to_string_lossy();
     
-        return Ok(TypeInfo{type_name, metadata_token: token});
+        return Ok(TypeInfo{
+            type_name, 
+            parent_token,
+            metadata_token: token
+        });
     }
 }
 
@@ -1019,4 +1040,38 @@ pub fn get_function_name_info<T: ICorProfilerInfo2 + ComInterface + ?Sized>(info
         module_name,
         class_name
     });
+}
+
+pub fn find_type_def_info(
+    metadata_import: &ComRc<dyn IMetaDataImport2>, 
+    fully_qualified_type_name: &str,
+    parent_token: mdToken
+) -> Result<Option<TypeInfo>, HRESULT> {
+
+    let mut hr = S_OK;
+    let mut type_token = mdTokenNil;
+
+    unsafe {
+        let type_name = to_widestring(fully_qualified_type_name);
+
+        hr = metadata_import.find_type_def_by_name(
+            type_name.as_ptr(),
+            parent_token,
+            &mut type_token
+        );
+
+        if hr == CLDB_E_RECORD_NOTFOUND || type_token == mdTokenNil
+        {
+            return Ok(None);
+        }
+        
+        if is_fail!(hr) {
+            return Err(hr);
+        }
+
+        return match get_type_info(metadata_import, type_token) {
+            Ok(t) => Ok(Some(t)),
+            Err(hr) => Err(hr)
+        }
+    }
 }

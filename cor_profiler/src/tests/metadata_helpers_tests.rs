@@ -3,7 +3,8 @@ use crate::cor_helpers::{
 };
 
 use crate::types::{
-    ofReadWriteMask, REFIID
+    ofReadWriteMask,
+    mdTokenNil
 };
 
 use crate::interfaces::{
@@ -15,7 +16,8 @@ use crate::interfaces::{
 
 use crate::metadata_helpers::{
     enum_assembly_refs,
-    enum_type_refs
+    enum_type_refs,
+    find_type_def_info
 };
 
 use std::{
@@ -25,7 +27,10 @@ use std::{
 
 use crate::guids::IID_IMetaDataImport2;
 use crate::utils::to_widestring;
-use crate::tests::common::unwrap_or_fail;
+use crate::tests::common::{
+    unwrap_or_fail,
+    unwrap_or_fail_opt
+};
 
 use com::{
     ComPtr,
@@ -134,8 +139,6 @@ pub fn should_find_assembly_ref() {
             "should not return Error");
 
         assert!(result.is_some(), "netstandard.dll should be referenced");
-
-        unsafe { metadata_assembly_import.release(); }
     });
 }
 
@@ -151,8 +154,6 @@ pub fn should_not_find_assembly_ref() {
             "should not return Error");
 
         assert!(result.is_none(), "System.Net.Http.dll should NOT be referenced");
-
-        unsafe { metadata_assembly_import.release(); }
     });
 }
 
@@ -169,8 +170,6 @@ pub fn should_find_type_ref() {
             "should not return Error");
 
         assert!(result.is_some(), "System.Object should be referenced");
-
-        unsafe { metadata_import.release(); }
     });
 }
 
@@ -187,7 +186,88 @@ pub fn should_not_find_type_ref() {
             "should not return Error");
 
         assert!(result.is_none(), "System.Net.Http.dll should NOT be referenced");
+    });
+}
 
-        unsafe { metadata_import.release(); }
+#[test]
+pub fn should_retrieve_existing_type_info() {
+    init();
+    METADATA.with(|md|{
+
+        let metadata_import = md.metadata_import();
+
+        let result = unwrap_or_fail(
+            find_type_def_info(
+                &metadata_import, 
+                "SampleLibrary.Class1", 
+            mdTokenNil),
+            "should not return Error");
+
+        let type_info = unwrap_or_fail_opt(
+            result, 
+            "should retrive info about SampleLibrary.Class1");
+
+        assert_eq!(type_info.type_name, "SampleLibrary.Class1");
+    });
+}
+
+#[test]
+pub fn should_not_error_retrieving_not_existing_type_info() {
+    init();
+    METADATA.with(|md|{
+
+        let metadata_import = md.metadata_import();
+
+        let result = unwrap_or_fail(
+            find_type_def_info(
+                &metadata_import, 
+                "System.Net.Http.HttpClient",
+                mdTokenNil),
+        "should not return Error");
+
+       assert!(
+           result.is_none(), 
+          "should NOT retrive info about System.Net.Http.HttpClient"
+        );
+    });
+}
+
+#[test]
+pub fn should_retrieve_existing_nested_class_info() {
+    init();
+    METADATA.with(|md|{
+
+        let metadata_import = md.metadata_import();
+
+        let class_1 = unwrap_or_fail(
+            find_type_def_info(
+                &metadata_import, 
+                "SampleLibrary.Class1",  
+            mdTokenNil),
+            "should not return Error");
+        
+        let class_1_type_info = unwrap_or_fail_opt(
+            class_1, 
+            "SampleLibrary.Class1 type info");
+
+        assert_eq!(class_1_type_info.type_name, "SampleLibrary.Class1");
+
+        let class_1_token = class_1_type_info.metadata_token;
+
+        let class_1_child = unwrap_or_fail(
+            find_type_def_info(
+                &metadata_import, 
+                "Class1Child", 
+                class_1_token),
+            "should not return Error");
+
+        let class_1_child_type_info = unwrap_or_fail_opt(
+            class_1_child, 
+            "SampleLibrary.Class1Child type info");   
+        
+        assert!(is_td_nested!(class_1_child_type_info.metadata_token), "");
+        assert_eq!(class_1_child_type_info.type_name, "Class1Child");
+        assert_eq!(class_1_child_type_info.parent_token, class_1_token);
+
     });
 }
