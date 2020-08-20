@@ -4,6 +4,9 @@ namespace SampleLibrary
 {
     public class Class1
     {
+        class Class1Child { }
+
+        private class Class1Child2 { }
 
         private int _value;
 
