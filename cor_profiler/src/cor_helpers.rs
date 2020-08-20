@@ -1,4 +1,5 @@
 #![allow(non_camel_case_types)]
+#![allow(non_upper_case_globals)]
 #![allow(dead_code)]
 #[macro_use]
 
@@ -27,6 +28,21 @@ use com::{
 };
 
 use crate::interfaces::IMetaDataDispenser;
+
+#[macro_export]
+macro_rules! type_from_token {
+    ($tk:expr) => {
+        ($tk as ULONG32) & 0xff000000;
+    }
+}
+
+#[macro_export]
+macro_rules! is_td_nested {
+    ($flags:expr) => {
+        (($flags as $crate::types::DWORD) & $crate::cor_helpers::CorTypeAttr::tdVisibilityMask) 
+            >= $crate::cor_helpers::CorTypeAttr::tdNestedPublic
+    }
+}
 
 pub(crate) struct CorSignature {
     arguments: Vec<COR_SIGNATURE>
@@ -91,6 +107,43 @@ impl CorSignature {
     }
 }
 
+#[macro_use]
+pub mod CorTypeAttr {
+    use crate::types::DWORD;
+
+    pub const tdVisibilityMask: DWORD = 0x00000007;
+    pub const tdNotPublic: DWORD = 0x00000000;
+    pub const tdPublic: DWORD = 0x00000001;
+    pub const tdNestedPublic: DWORD = 0x00000002;
+    pub const tdNestedPrivate: DWORD = 0x00000003;
+    pub const tdNestedFamily: DWORD = 0x00000004;
+    pub const tdNestedAssembly: DWORD = 0x00000005;
+    pub const tdNestedFamANDAssem: DWORD = 0x00000006;
+    pub const tdNestedFamORAssem: DWORD = 0x00000007;
+    pub const tdLayoutMask: DWORD = 0x00000018;
+    pub const tdAutoLayout: DWORD = 0x00000000;
+    pub const tdSequentialLayout: DWORD = 0x00000008;
+    pub const tdExplicitLayout: DWORD = 0x00000010;
+    pub const tdClassSemanticsMask: DWORD = 0x00000060;
+    pub const tdClass: DWORD = 0x00000000;
+    pub const tdInterface: DWORD = 0x00000020;
+    pub const tdAbstract: DWORD = 0x00000080;
+    pub const tdSealed: DWORD = 0x00000100;
+    pub const tdSpecialName: DWORD = 0x00000400;
+    pub const tdImport: DWORD = 0x00001000;
+    pub const tdSerializable: DWORD = 0x00002000;
+    pub const tdStringFormatMask: DWORD = 0x00030000;
+    pub const tdAnsiClass: DWORD = 0x00000000;
+    pub const tdUnicodeClass: DWORD = 0x00010000;
+    pub const tdAutoClass: DWORD = 0x00020000;
+    pub const tdCustomFormatClass: DWORD = 0x00030000;
+    pub const tdCustomFormatMask: DWORD = 0x00C00000;
+    pub const tdBeforeFieldInit: DWORD = 0x00100000;
+    pub const tdForwarder: DWORD = 0x00200000;
+    pub const tdReservedMask: DWORD = 0x00040800;
+    pub const tdRTSpecialName: DWORD = 0x00000800;
+    pub const tdHasSecurity: DWORD = 0x00040000;
+}
 
 #[derive(FromPrimitive)]
 #[derive(ToPrimitive)]
