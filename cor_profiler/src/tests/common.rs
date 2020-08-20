@@ -17,7 +17,7 @@ pub(crate) fn unwrap_or_fail<T>(r: Result<T, HRESULT>, msg: &str) -> T {
             let err_lbl = format!(" hr=0x{:x}", hr);
             let assert_msg = msg.to_string() + &err_lbl;
             assert!(false, assert_msg);
-            panic!("");
+            panic!();
         }
         Ok(val) => val
     }
@@ -27,10 +27,8 @@ pub(crate) fn unwrap_or_fail<T>(r: Result<T, HRESULT>, msg: &str) -> T {
 pub(crate) fn unwrap_or_fail_opt<T>(r: Option<T>, msg: &str) -> T {
     match r {
         None => {
-            let err_lbl = format!("Couldn't get value for {}", msg);
-            let assert_msg = msg.to_string() + &err_lbl;
-            assert!(false, assert_msg);
-            panic!("");
+            assert!(false, msg.to_string());
+            panic!();
         }
         Some(val) => val
     }

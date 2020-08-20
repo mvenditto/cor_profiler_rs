@@ -1048,20 +1048,50 @@ pub fn find_type_def_info(
     parent_token: mdToken
 ) -> Result<Option<TypeInfo>, HRESULT> {
 
-    let mut hr = S_OK;
     let mut type_token = mdTokenNil;
 
     unsafe {
         let type_name = to_widestring(fully_qualified_type_name);
 
-        hr = metadata_import.find_type_def_by_name(
+        let hr = metadata_import.find_type_def_by_name(
             type_name.as_ptr(),
             parent_token,
             &mut type_token
         );
 
-        if hr == CLDB_E_RECORD_NOTFOUND || type_token == mdTokenNil
-        {
+        if hr == CLDB_E_RECORD_NOTFOUND || type_token == mdTokenNil{
+            return Ok(None);
+        }
+        
+        if is_fail!(hr) {
+            return Err(hr);
+        }
+
+        return match get_type_info(metadata_import, type_token) {
+            Ok(t) => Ok(Some(t)),
+            Err(hr) => Err(hr)
+        }
+    }
+}
+
+pub fn find_type_ref_info(
+    metadata_import: &ComRc<dyn IMetaDataImport2>, 
+    fully_qualified_type_name: &str,
+    resolution_scope_token: mdToken
+) -> Result<Option<TypeInfo>, HRESULT> {
+
+    let mut type_token: mdTypeRef = mdTokenNil;
+
+    unsafe {
+        let type_name = to_widestring(fully_qualified_type_name);
+
+        let hr = metadata_import.find_type_ref(
+            resolution_scope_token,
+            type_name.as_ptr(),
+            &mut type_token
+        );
+
+        if hr == CLDB_E_RECORD_NOTFOUND || type_token == mdTokenNil{
             return Ok(None);
         }
         

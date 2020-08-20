@@ -4,7 +4,8 @@ use crate::cor_helpers::{
 
 use crate::types::{
     ofReadWriteMask,
-    mdTokenNil
+    mdTokenNil,
+    mdAssemblyRef
 };
 
 use crate::interfaces::{
@@ -17,7 +18,8 @@ use crate::interfaces::{
 use crate::metadata_helpers::{
     enum_assembly_refs,
     enum_type_refs,
-    find_type_def_info
+    find_type_def_info,
+    find_type_ref_info
 };
 
 use std::{
@@ -158,7 +160,7 @@ pub fn should_not_find_assembly_ref() {
 }
 
 #[test]
-pub fn should_find_type_ref() {
+pub fn should_find_type_ref_enumerating() {
     init();
     METADATA.with(|md|{
 
@@ -174,7 +176,7 @@ pub fn should_find_type_ref() {
 }
 
 #[test]
-pub fn should_not_find_type_ref() {
+pub fn should_not_find_type_ref_enumerating() {
     init();
     METADATA.with(|md|{
 
@@ -269,5 +271,37 @@ pub fn should_retrieve_existing_nested_class_info() {
         assert_eq!(class_1_child_type_info.type_name, "Class1Child");
         assert_eq!(class_1_child_type_info.parent_token, class_1_token);
 
+    });
+}
+
+#[test]
+pub fn should_find_type_ref() {
+    init();
+    METADATA.with(|md|{
+        let metadata_import = md.metadata_import();
+        let metadata_assembly_import = md.metadata_assembly_import();
+        
+        let maybe_assembly_ref = unwrap_or_fail(enum_assembly_refs(
+            &metadata_assembly_import, 
+            "mscorlib"),
+            "should not return Error");
+        
+        let assembly_ref: mdAssemblyRef = unwrap_or_fail_opt(
+            maybe_assembly_ref, 
+            "should find mscorlib ref");
+        
+        let maybe_type_info = unwrap_or_fail(
+            find_type_ref_info(
+                &metadata_import, 
+                "System.Object",  
+                assembly_ref),
+            "should not return Error");
+        
+        let type_info = unwrap_or_fail_opt(
+            maybe_type_info, 
+            "should find System.Object type info");
+        
+        assert_eq!(type_info.type_name, "System.Object");
+        
     });
 }
