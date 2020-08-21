@@ -12,6 +12,9 @@ use crate::interfaces::{
     IMetaDataDispenser,
     IMetaDataImport,
     IMetaDataImport2,
+    IMetaDataEmit,
+    IMetaDataEmit2,
+    IMetaDataAssemblyEmit,
     IMetaDataAssemblyImport
 };
 
@@ -19,7 +22,8 @@ use crate::metadata_helpers::{
     enum_assembly_refs,
     enum_type_refs,
     find_type_def_info,
-    find_type_ref_info
+    find_type_ref_info,
+    define_assembly_reference
 };
 
 use std::{
@@ -51,6 +55,8 @@ static INIT: Once = Once::new();
 struct MetaData {
     metadata_import: RefCell<Option<ComRc<dyn IMetaDataImport2>>>,
     metadata_assembly_import: RefCell<Option<ComRc<dyn IMetaDataAssemblyImport>>>,
+    metadata_emit: RefCell<Option<ComRc<dyn IMetaDataEmit2>>>,
+    metadata_assembly_emit: RefCell<Option<ComRc<dyn IMetaDataAssemblyEmit>>>
 }
 
 unsafe impl Sync for MetaData { }
@@ -69,12 +75,29 @@ impl MetaData {
             _ => panic!()
         }
     }
+
+    fn metadata_emit(&self) -> ComRc<dyn IMetaDataEmit2> {
+        match self.metadata_emit.borrow().as_ref() {
+            Some(i) => ComRc::clone(&i),
+            _ => panic!()
+        }
+    }
+
+    fn metadata_assembly_emit(&self) -> ComRc<dyn IMetaDataAssemblyEmit> {
+        match self.metadata_assembly_emit.borrow().as_ref() {
+            Some(i) => ComRc::clone(&i),
+            _ => panic!()
+        }
+    }
+
 }
 
 thread_local! {
     static METADATA: MetaData = MetaData {
         metadata_import: RefCell::new(None),
-        metadata_assembly_import: RefCell::new(None)
+        metadata_assembly_import: RefCell::new(None),
+        metadata_emit: RefCell::new(None),
+        metadata_assembly_emit: RefCell::new(None),
     };
 }
 
@@ -112,6 +135,12 @@ fn setup() {
 
         let metadata_assembly_import = 
             iunk.get_interface::<dyn IMetaDataAssemblyImport>().unwrap();
+            
+        let metadata_emit = 
+            iunk.get_interface::<dyn IMetaDataEmit2>().unwrap();
+
+        let metadata_assembly_emit = 
+            iunk.get_interface::<dyn IMetaDataAssemblyEmit>().unwrap();
 
         METADATA.with(|md|{
             md.metadata_import.replace(Some(metadata_import));
@@ -119,6 +148,14 @@ fn setup() {
 
         METADATA.with(|md|{
             md.metadata_assembly_import.replace(Some(metadata_assembly_import));
+        });
+
+        METADATA.with(|md|{
+            md.metadata_emit.replace(Some(metadata_emit));
+        });
+
+        METADATA.with(|md|{
+            md.metadata_assembly_emit.replace(Some(metadata_assembly_emit));
         });
 
         metadata_dispenser.release();
@@ -304,4 +341,35 @@ pub fn should_find_type_ref() {
         assert_eq!(type_info.type_name, "System.Object");
         
     });
+}
+
+#[test]
+pub fn should_inject_assembly_ref() {
+    init();
+    METADATA.with(|md|{
+        let metadata_assembly_import = md.metadata_assembly_import();
+        let metadata_assembly_emit = md.metadata_assembly_emit();
+
+        let system_net_http_assembly_ref = 
+            enum_assembly_refs(&metadata_assembly_import, "System.Net.Http");
+
+        assert!(system_net_http_assembly_ref.unwrap().is_none(), "System.Net.Http should not be referenced");
+
+        let new_assembly_ref = unwrap_or_fail(define_assembly_reference(
+            &metadata_assembly_emit, 
+            &[0xb0, 0x3f, 0x5f, 0x7f, 0x11, 0xd5, 0x0a, 0x3a], 
+            "System.Net.Http", 
+            "neutral", 
+            "4.2.2.0"
+        ), "");
+
+        assert_ne!(new_assembly_ref, mdTokenNil);
+
+        let _ = unwrap_or_fail(
+            enum_assembly_refs(&metadata_assembly_import, "System.Net.Http"), 
+            "System.Net.Http should now be referenced");
+
+    })
+
+
 }
