@@ -54,6 +54,15 @@ IMetaDataDispenser* clr_runtime_get_metadata_dispenser(C_ICLRRuntimeInfo runtime
     return metadata_dispenser;
 }
 
+HMODULE clr_runtime_load_library(C_ICLRRuntimeInfo runtime_info, LPCWSTR library_name, HRESULT* hr)
+{
+    wprintf(L"library: %s\n", library_name);
+    auto _runtime_info = reinterpret_cast<ICLRRuntimeInfo*>(runtime_info);
+    HMODULE hmodule;
+    *hr = _runtime_info->LoadLibraryW(library_name, &hmodule);
+    return hmodule;
+}
+
 UINT __cdecl cor_sig_compress_token(mdToken token, void* out_buffer)
 {
     return CorSigCompressToken(token, out_buffer);

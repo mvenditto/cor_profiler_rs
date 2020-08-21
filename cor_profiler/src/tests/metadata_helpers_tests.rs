@@ -1,11 +1,13 @@
 use crate::cor_helpers::{
-    ICLRMetaHost
+    ICLRMetaHost,
+    ICLRRuntimeInfo
 };
 
 use crate::types::{
     ofReadWriteMask,
     mdTokenNil,
-    mdAssemblyRef
+    mdAssemblyRef,
+    PVOID
 };
 
 use crate::interfaces::{
@@ -13,6 +15,7 @@ use crate::interfaces::{
     IMetaDataImport,
     IMetaDataImport2,
     IMetaDataEmit,
+    ICLRRuntimeHost,
     IMetaDataEmit2,
     IMetaDataAssemblyEmit,
     IMetaDataAssemblyImport
@@ -89,7 +92,23 @@ impl MetaData {
             _ => panic!()
         }
     }
+}
 
+struct ClrInstance {
+    metahost: RefCell<Option<ICLRMetaHost>>,
+    runtime_info: RefCell<Option<ICLRRuntimeInfo>>,
+    runtime_host: RefCell<Option<ComRc<dyn ICLRRuntimeHost>>>
+}
+
+unsafe impl Sync for ClrInstance { }
+
+impl ClrInstance {
+    fn runtime_host(&self) -> ComRc<dyn ICLRRuntimeHost> {
+        match self.runtime_host.borrow().as_ref() {
+            Some(i) => ComRc::clone(&i),
+            _ => panic!()
+        }
+    }
 }
 
 thread_local! {
@@ -98,6 +117,12 @@ thread_local! {
         metadata_assembly_import: RefCell::new(None),
         metadata_emit: RefCell::new(None),
         metadata_assembly_emit: RefCell::new(None),
+    };
+
+    static CLR: ClrInstance = ClrInstance {
+        metahost: RefCell::new(None),
+        runtime_info: RefCell::new(None),
+        runtime_host: RefCell::new(None)
     };
 }
 
@@ -126,6 +151,11 @@ fn setup() {
         if hr < 0 {
             panic!("failed to open {} metadata hr=0x{:x}",scope_path, hr);
         }
+
+        CLR.with(|clr|{
+            clr.metahost.replace(Some(metahost));
+            clr.runtime_info.replace(Some(runtime));
+        });
         
         let iunk = 
             ComPtr::<dyn IUnknown>::new(unkn as *mut _).upgrade();
@@ -164,6 +194,24 @@ fn setup() {
 
 fn init() {
     INIT.call_once(setup);
+}
+
+#[test]
+pub fn clr_runtime_load_assembly() {
+    init();
+    CLR.with(|clr| {
+        let _runtime_info = clr.runtime_info.borrow();
+        let runtime_info = _runtime_info.as_ref().unwrap();
+        let lib = r#"System.Net.Http.dll"#;
+        let result = runtime_info.load_library(lib);
+        /*
+        match result {
+            Err(hr) => println!("hr=0x{:x}", hr),
+            Ok(hmodule) => println!("hr=0x{:p}", hmodule as PVOID)
+        }
+        */
+        assert!(result.is_ok(), "should return a module handle");
+    });
 }
 
 #[test]
@@ -361,15 +409,15 @@ pub fn should_inject_assembly_ref() {
             "System.Net.Http", 
             "neutral", 
             "4.2.2.0"
-        ), "");
+        ), "should be able to create an assembly reference");
 
         assert_ne!(new_assembly_ref, mdTokenNil);
 
-        let _ = unwrap_or_fail(
-            enum_assembly_refs(&metadata_assembly_import, "System.Net.Http"), 
-            "System.Net.Http should now be referenced");
+        let maybe_typeref  = 
+            enum_assembly_refs(&metadata_assembly_import, "System.Net.Http");
+        
+        assert!(maybe_typeref.unwrap().is_some(), "System.Net.Http should now be referenced");
 
-    })
-
-
+        
+    });
 }

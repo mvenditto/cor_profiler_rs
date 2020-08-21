@@ -6,6 +6,7 @@
 use std::{slice, ffi::c_void, ptr};
 use num_derive::FromPrimitive;
 use num_derive::ToPrimitive; 
+use crate::utils::to_widestring;
 
 use crate::types::{
     mdToken,
@@ -15,7 +16,8 @@ use crate::types::{
     LPWSTR,
     LPCWSTR,
     DWORD,
-    WCHAR
+    WCHAR,
+    HMODULE
 };
 
 extern crate widestring;
@@ -309,6 +311,19 @@ impl ICLRMetaHost {
             Ok(ComPtr::<dyn IMetaDataDispenser>::new(unkn as *mut _).upgrade())
         }
      }
+
+     pub fn load_library(&self, library_name: &str) -> Result<HMODULE, HRESULT> {
+         unsafe {
+            let mut hr: HRESULT = 0;
+            let wstr = to_widestring(library_name);
+            let hmodule = clr_runtime_load_library(
+                self.native, wstr.as_ptr(), &mut hr);
+            if hr < 0 {
+                return Err(hr);
+            }
+            return Ok(hmodule);
+        }
+     }
  }
 
 #[link(name = "Native", kind="static")]
@@ -320,6 +335,8 @@ extern {
     pub fn clr_runtime_info_get_version_string(runtime_info: C_ICLRRuntimeInfo, hr: *mut HRESULT) -> LPCWSTR;
 
     pub fn clr_runtime_get_metadata_dispenser(runtime_info: C_ICLRRuntimeInfo, hr: *mut HRESULT) -> *mut c_void;
+
+    pub fn clr_runtime_load_library(runtime_info: C_ICLRRuntimeInfo, library_name: LPCWSTR, hr: *mut HRESULT) -> HMODULE;
 
     pub fn cor_sig_compress_token(token: mdToken, out_buff: *mut c_void) -> ULONG;
 

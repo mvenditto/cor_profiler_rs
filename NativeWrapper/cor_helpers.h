@@ -16,6 +16,8 @@ extern "C" {
 
     __declspec(dllexport) IMetaDataDispenser* clr_runtime_get_metadata_dispenser(C_ICLRRuntimeInfo runtime_info, HRESULT* hr);
 
+    __declspec(dllexport) HMODULE clr_runtime_load_library(C_ICLRRuntimeInfo runtime_info, LPCWSTR library_name, HRESULT* hr);
+
 	__declspec(dllexport) UINT cor_sig_compress_token(
         mdToken token, void* out_buffer);
 
