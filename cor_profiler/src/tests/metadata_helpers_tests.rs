@@ -47,6 +47,7 @@ use crate::utils::{
     to_widestring,
     relative_to_cwd
 };
+
 use crate::tests::common::{
     unwrap_or_fail,
     unwrap_or_fail_opt
@@ -159,7 +160,7 @@ fn setup() {
             &mut unkn);
 
         if hr < 0 {
-            panic!("failed to open {} metadata hr=0x{:x}",scope_path, hr);
+            panic!("failed to open {} metadata hr=0x{:x}", scope_path, hr);
         }
 
         let runtime_host = get_clr_runtime_host(&runtime).unwrap();
@@ -223,7 +224,7 @@ pub fn clr_runtime_host_test() {
             let method = to_widestring("TestMethod");
             let arg = to_widestring("42+42");
             let mut hr = runtime_host.start();
-            assert!(hr >= 0, "should start clr");
+            assert_ok!(hr, "should start clr");
             let mut retval: DWORD = 0;
             hr = runtime_host.execute_in_default_app_domain(
                 assembly.as_ptr(),
@@ -232,11 +233,10 @@ pub fn clr_runtime_host_test() {
                 arg.as_ptr(),
                 &mut retval
             );
-            println!("hr=0x{:x}", hr);
-            assert!(hr >= 0, "should execute_in_default_app_domain");
+            assert_ok!(hr, "should execute_in_default_app_domain");
             assert_eq!(retval, 84 as DWORD);
             hr = runtime_host.stop();
-            assert!(hr >= 0, "should stop clr");
+            assert_ok!(hr, "should stop clr");
         }
     });
 }
@@ -463,6 +463,5 @@ pub fn should_inject_assembly_ref() {
         
         assert!(maybe_typeref.unwrap().is_some(), "System.Net.Http should now be referenced");
 
-        
     });
 }

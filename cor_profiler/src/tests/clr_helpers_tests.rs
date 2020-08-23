@@ -81,9 +81,7 @@ fn test_clr_metadata_dispenser_open_scope() {
     let scope = r#"C:\Windows\Microsoft.NET\Framework\"#.to_string() 
             + &runtime_version 
             + r#"\System.Net.Http.dll"#;
-    
-    println!("{}", scope);
-    
+   
     let metadata_dispenser = unwrap_or_fail(
         get_metadata_dispenser(&runtime),
         "Couldn't get metadata dispenser"
@@ -98,24 +96,6 @@ fn test_clr_metadata_dispenser_open_scope() {
             ofReadWriteMask, 
             &IID_IMetaDataImport2, 
             &mut unkn);
-        assert!(hr == S_OK, format!("failed to open {} metadata hr=0x{:x}",scope, hr));
-
-        /*
-        let metadata_import =  unwrap_or_fail_opt(
-            iunk.get_interface::<dyn IMetaDataImport2>(),
-            "IMetaDataImport"
-        );
-
-        let http_client_token: mdToken = 0x02000012;
-
-        let type_info = unwrap_or_fail(
-            get_type_info(&metadata_import, http_client_token),
-            &format!("Failed to retrieve TypeInfo for 0x{:x}", http_client_token),
-        );
-
-        assert_eq!("System.Net.Http.HttpClient", type_info.type_name);
-        */
-
+        assert_ok!(hr, format!("failed to open {} metadata", scope));
     }
-
 }

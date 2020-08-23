@@ -1,6 +1,20 @@
 use com::sys::HRESULT;
 use ctor;
 
+#[macro_export]
+macro_rules! assert_ok {
+    ($hr:expr, $arg:expr) => {
+        assert!($hr >= 0, format!("{} hr=0x{:x}", $arg, $hr))
+    };
+}
+
+#[macro_export]
+macro_rules! assert_err {
+    ($hr:expr, $arg:expr) => {
+        assert!($hr < 0, format!("{} hr=0x{:x}", $arg, $hr))
+    };
+}
+
 #[cfg(test)]
 #[ctor::ctor]
 fn init_log_for_tests() {
