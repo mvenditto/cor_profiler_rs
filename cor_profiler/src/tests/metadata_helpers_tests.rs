@@ -43,7 +43,10 @@ use std::{
 };
 
 use crate::guids::IID_IMetaDataImport2;
-use crate::utils::to_widestring;
+use crate::utils::{
+    to_widestring,
+    relative_to_cwd
+};
 use crate::tests::common::{
     unwrap_or_fail,
     unwrap_or_fail_opt
@@ -207,28 +210,35 @@ fn init() {
 }
 
 #[test]
-pub fn clr_test() {
-    let meta_host = create_clr_metahost().unwrap();
-    unsafe {
-        let mut unk_enum: *mut c_void = ptr::null_mut();
-        let mut hr = meta_host.enumerate_installed_runtimes(
-            (&mut unk_enum) as *mut _ as *mut *mut dyn IEnumUnknown);
-        assert!(hr >= 0, "should create runtimes enum");
-        let mut unk: *mut c_void = ptr::null_mut();
-        let ienum = ComPtr::<dyn IEnumUnknown>::new(unk_enum as *mut _).upgrade();
-        hr = ienum.next(1, (&mut unk) as *mut _ as *mut *mut dyn IUnknown, ptr::null_mut());
-        assert!(hr >= 0, "should get next without errors");
-        let runtime = ComPtr::<dyn ICLRRuntimeInfo>::new(unk as *mut _).upgrade();
-        let mut buffer: [WCHAR; 256] = [0; 256];
-        let wstr = buffer.as_mut_ptr() as LPWSTR;
-        let mut bytes: DWORD = 256;
-        hr = runtime.get_version_string(wstr, &mut bytes);
-        assert!(hr >= 0, "should get runtime version string");
-        let version_string  = 
-            U16String::from_ptr(wstr, (bytes-1) as usize).to_string_lossy();
-        println!("version: {}", version_string);
-    
-    }
+pub fn clr_runtime_host_test() {
+    init();
+    CLR.with(|clr| {
+        let runtime_host = clr.runtime_host();
+
+        unsafe {
+            let assembly = to_widestring(
+                &relative_to_cwd(r#"examples\SampleLibrary\SampleProgram\bin\Debug\net48\SampleProgram.dll"#));
+           
+            let type_name = to_widestring("SampleProgram.Program");
+            let method = to_widestring("TestMethod");
+            let arg = to_widestring("42+42");
+            let mut hr = runtime_host.start();
+            assert!(hr >= 0, "should start clr");
+            let mut retval: DWORD = 0;
+            hr = runtime_host.execute_in_default_app_domain(
+                assembly.as_ptr(),
+                type_name.as_ptr(),
+                method.as_ptr(),
+                arg.as_ptr(),
+                &mut retval
+            );
+            println!("hr=0x{:x}", hr);
+            assert!(hr >= 0, "should execute_in_default_app_domain");
+            assert_eq!(retval, 84 as DWORD);
+            hr = runtime_host.stop();
+            assert!(hr >= 0, "should stop clr");
+        }
+    });
 }
 
 #[test]

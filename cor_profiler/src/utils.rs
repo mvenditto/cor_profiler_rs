@@ -4,8 +4,15 @@ use std::{
 };
 
 #[cfg(windows)] 
-pub(crate) fn to_widestring( value : &str ) -> Vec<u16> {
+pub(crate) fn to_widestring(value: &str ) -> Vec<u16> {
     OsStr::new(value).encode_wide().chain(std::iter::once(0)).collect()
+}
+
+pub(crate) fn relative_to_cwd(path: &str) -> String {
+    let mut scope = std::env::current_dir().unwrap();
+    scope.pop();
+    scope.push(path);
+    String::from(scope.to_string_lossy())
 }
 
 /*

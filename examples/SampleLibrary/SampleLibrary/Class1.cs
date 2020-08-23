@@ -10,12 +10,12 @@ namespace SampleLibrary
 
         private int _value;
 
-        private Class1(int value)
+        public Class1(int value)
         {
             _value = value;
         }
 
-        private Class1(): this(42)
+        public Class1(): this(42)
         {
 
         }
