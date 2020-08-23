@@ -251,92 +251,101 @@ pub(crate) enum CorTokenType
 type C_ICLRMetaHost = *mut c_void;
 type C_ICLRRuntimeInfo = *mut c_void;
 
-pub(crate) struct ICLRMetaHost {
+pub(crate) struct CLRMetaHost {
     native: C_ICLRMetaHost
 }
 
 //#[derive(Copy)]
-pub(crate) struct ICLRRuntimeInfo {
+pub(crate) struct CLRRuntimeInfo {
     native: C_ICLRRuntimeInfo
 }
 
-impl ICLRMetaHost {
-    pub fn create() -> Result<Self, HRESULT> {
-        unsafe {
-            let mut hr: HRESULT = 0;
-            let meta_host_ptr = clr_create_meta_host(&mut hr);
-            if hr < 0 {
-                return Err(hr);
-            }
-            Ok(ICLRMetaHost { native: meta_host_ptr })
-        }
-    }
+use crate::interfaces::{
+    ICLRMetaHost,
+    ICLRRuntimeInfo,
+    IEnumUnknown
+};
 
-    pub fn get_latest_installed_runtime(&self) -> Result<ICLRRuntimeInfo, HRESULT> {
-        unsafe {
-            let mut hr: HRESULT = 0;
-            let raw_ptr = clr_get_latest_installed_runtime(self.native, &mut hr);
-            if hr < 0 {
-                return Err(hr);
-            }
-            Ok(ICLRRuntimeInfo { native: raw_ptr })
-        }
-    }
- }
+use com::interfaces::IUnknown;
 
- #[cfg(windows)]     
- fn from_wide_string(s: &[WCHAR]) -> String {         
-     use std::ffi::OsString;         
-    use std::os::windows::ffi::OsStringExt;         
-    let slice = s.split(|&v| v == 0).next().unwrap();         
-    OsString::from_wide(slice).to_string_lossy().into()     
+pub fn create_clr_metahost() -> Result<ComRc<dyn ICLRMetaHost>, HRESULT> {
+    unsafe {
+        let mut hr: HRESULT = 0;
+        let meta_host_ptr = clr_create_meta_host(&mut hr);
+        if hr < 0 {
+            return Err(hr);
+        }
+        Ok(ComPtr::<dyn ICLRMetaHost>::new(meta_host_ptr as *mut _).upgrade())
+    }
 }
 
- impl ICLRRuntimeInfo {
-     pub fn get_version_string(&self) -> Result<String, HRESULT> {
-         unsafe {
-            let mut hr: HRESULT = 0;
-            let version: LPCWSTR = clr_runtime_info_get_version_string(self.native, &mut hr);
-            if hr < 0 { return Err(hr); }
-            let version_string = U16CString::from_ptr_str(version);
-            Ok(version_string.to_string_lossy())
-         }
-     }
-
-     pub fn get_metadata_dispenser(&self) -> Result<ComRc<dyn IMetaDataDispenser>,HRESULT> {
-        unsafe {
-            let mut hr: HRESULT = 0;
-            let unkn = clr_runtime_get_metadata_dispenser(self.native, &mut hr);
-            if hr < 0 { return Err(hr); }
-            Ok(ComPtr::<dyn IMetaDataDispenser>::new(unkn as *mut _).upgrade())
+pub fn get_latest_installed_runtime(metahost: &ComRc<dyn ICLRMetaHost>) -> Result<ComRc<dyn ICLRRuntimeInfo>,HRESULT> {
+    unsafe {
+        let mut unk_enum: *mut c_void = ptr::null_mut();
+        let mut hr = metahost.enumerate_installed_runtimes((&mut unk_enum) as *mut _ as *mut *mut dyn IEnumUnknown);
+        if hr < 0 { return Err(hr); }
+        let mut unk: *mut c_void = ptr::null_mut();
+        let mut runtime: *mut c_void = ptr::null_mut();
+        let ienum = ComPtr::<dyn IEnumUnknown>::new(unk_enum as *mut _).upgrade();
+        let mut fetched: ULONG = 0;
+        loop {
+            hr = ienum.next(1, (&mut unk) as *mut _ as *mut *mut dyn IUnknown, &mut fetched);
+            if hr < 0 || fetched <= 0 { break }
+            runtime = unk;
         }
-     }
+        if runtime.is_null() { return Err(hr); }
+        Ok(ComPtr::<dyn ICLRRuntimeInfo>::new(runtime as *mut _).upgrade())
+    }
+}
 
-     pub fn load_library(&self, library_name: &str) -> Result<HMODULE, HRESULT> {
-         unsafe {
-            let mut hr: HRESULT = 0;
-            let wstr = to_widestring(library_name);
-            let hmodule = clr_runtime_load_library(
-                self.native, wstr.as_ptr(), &mut hr);
-            if hr < 0 {
-                return Err(hr);
-            }
-            return Ok(hmodule);
-        }
-     }
- }
+use crate::guids::{
+    CLSID_CorMetaDataDispenser,
+    IID_IMetaDataDispenser
+};
+
+pub fn get_metadata_dispenser(runtime: &ComRc<dyn ICLRRuntimeInfo>) -> Result<ComRc<dyn IMetaDataDispenser>,HRESULT> {
+    unsafe {
+        let mut unk: *mut c_void = ptr::null_mut();
+        let hr = runtime.get_interface2(&CLSID_CorMetaDataDispenser, &IID_IMetaDataDispenser, &mut unk);
+        if hr < 0 { return Err(hr); }
+        Ok(ComPtr::<dyn IMetaDataDispenser>::new(unk as *mut _).upgrade())
+    }
+}
+
+pub fn get_clr_runtime_version_string(runtime: &ComRc<dyn ICLRRuntimeInfo>) -> Result<String, HRESULT> {
+    unsafe {
+        let mut buffer: [WCHAR; 256] = [0; 256];
+        let wstr = buffer.as_mut_ptr() as LPWSTR;
+        let mut bytes: DWORD = 256;
+        let hr = runtime.get_version_string(wstr, &mut bytes);
+        if hr < 0 { return Err(hr); }
+        let version_string  = 
+            U16String::from_ptr(wstr, (bytes-1) as usize).to_string_lossy();
+        return Ok(version_string);
+    }
+}
+
+pub fn load_library(runtime: &ComRc<dyn ICLRRuntimeInfo>, library_name: &str) -> Result<HMODULE, HRESULT> {
+    unsafe {
+        let wstr = to_widestring(library_name);
+        let mut hmodule: HMODULE = ptr::null_mut();
+        let hr = runtime.load_library(wstr.as_ptr(), &mut hmodule);
+        if hr < 0 { return Err(hr); }
+        Ok(hmodule)
+    }
+}
 
 #[link(name = "Native", kind="static")]
 extern {
     pub fn clr_create_meta_host(hr: *mut HRESULT) -> C_ICLRMetaHost;
 
-    pub fn clr_get_latest_installed_runtime(metahost: C_ICLRMetaHost, hr: *mut HRESULT) -> C_ICLRRuntimeInfo;
+    // pub fn clr_get_latest_installed_runtime(metahost: C_ICLRMetaHost, hr: *mut HRESULT) -> C_ICLRRuntimeInfo;
 
-    pub fn clr_runtime_info_get_version_string(runtime_info: C_ICLRRuntimeInfo, hr: *mut HRESULT) -> LPCWSTR;
+    // pub fn clr_runtime_info_get_version_string(runtime_info: C_ICLRRuntimeInfo, hr: *mut HRESULT) -> LPCWSTR;
 
-    pub fn clr_runtime_get_metadata_dispenser(runtime_info: C_ICLRRuntimeInfo, hr: *mut HRESULT) -> *mut c_void;
+    // pub fn clr_runtime_get_metadata_dispenser(runtime_info: C_ICLRRuntimeInfo, hr: *mut HRESULT) -> *mut c_void;
 
-    pub fn clr_runtime_load_library(runtime_info: C_ICLRRuntimeInfo, library_name: LPCWSTR, hr: *mut HRESULT) -> HMODULE;
+    // pub fn clr_runtime_load_library(runtime_info: C_ICLRRuntimeInfo, library_name: LPCWSTR, hr: *mut HRESULT) -> HMODULE;
 
     pub fn cor_sig_compress_token(token: mdToken, out_buff: *mut c_void) -> ULONG;
 

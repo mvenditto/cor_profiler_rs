@@ -1,13 +1,18 @@
 use crate::cor_helpers::{
-    ICLRMetaHost,
-    ICLRRuntimeInfo
+    create_clr_metahost,
+    get_latest_installed_runtime,
+    get_clr_runtime_version_string,
+    get_metadata_dispenser,
+    load_library
 };
 
 use crate::types::{
     ofReadWriteMask,
     mdTokenNil,
     mdAssemblyRef,
-    PVOID
+    LPWSTR,
+    WCHAR,
+    DWORD
 };
 
 use crate::interfaces::{
@@ -16,9 +21,12 @@ use crate::interfaces::{
     IMetaDataImport2,
     IMetaDataEmit,
     ICLRRuntimeHost,
+    ICLRMetaHost,
+    ICLRRuntimeInfo,
     IMetaDataEmit2,
     IMetaDataAssemblyEmit,
-    IMetaDataAssemblyImport
+    IMetaDataAssemblyImport,
+    IEnumUnknown
 };
 
 use crate::metadata_helpers::{
@@ -51,6 +59,7 @@ use com::{
 
 use std::sync::Once;
 use std::cell::RefCell;
+use widestring::U16String;
 
 
 static INIT: Once = Once::new();
@@ -95,8 +104,8 @@ impl MetaData {
 }
 
 struct ClrInstance {
-    metahost: RefCell<Option<ICLRMetaHost>>,
-    runtime_info: RefCell<Option<ICLRRuntimeInfo>>,
+    metahost: RefCell<Option<ComRc<dyn ICLRMetaHost>>>,
+    runtime_info: RefCell<Option<ComRc<dyn ICLRRuntimeInfo>>>,
     runtime_host: RefCell<Option<ComRc<dyn ICLRRuntimeHost>>>
 }
 
@@ -128,16 +137,16 @@ thread_local! {
 
 fn setup() {
     info!("do setup()");
-    let metahost = ICLRMetaHost::create().unwrap();
-    let runtime = metahost.get_latest_installed_runtime().unwrap();
-    let runtime_version = runtime.get_version_string().unwrap();
+    let metahost = create_clr_metahost().unwrap();
+    let runtime = get_latest_installed_runtime(&metahost).unwrap();
+    let runtime_version = get_clr_runtime_version_string(&runtime).unwrap();
     info!("latest runtime version: {}", runtime_version);
     let mut scope = std::env::current_dir().unwrap();
     scope.pop();
     scope.push(r#"examples\SampleLibrary\SampleLibrary\bin\Debug\netstandard2.0\SampleLibrary.dll"#);
     let scope_path = scope.to_string_lossy();
     info!("scope: {}", scope_path);
-    let metadata_dispenser = runtime.get_metadata_dispenser().unwrap();
+    let metadata_dispenser = get_metadata_dispenser(&runtime).unwrap();
     let scope_wstr = to_widestring(&scope_path);
     unsafe {
         let mut unkn: *mut c_void = ptr::null_mut();
@@ -155,6 +164,7 @@ fn setup() {
         CLR.with(|clr|{
             clr.metahost.replace(Some(metahost));
             clr.runtime_info.replace(Some(runtime));
+            clr.runtime_host.replace(None)
         });
         
         let iunk = 
@@ -197,13 +207,38 @@ fn init() {
 }
 
 #[test]
+pub fn clr_test() {
+    let meta_host = create_clr_metahost().unwrap();
+    unsafe {
+        let mut unk_enum: *mut c_void = ptr::null_mut();
+        let mut hr = meta_host.enumerate_installed_runtimes(
+            (&mut unk_enum) as *mut _ as *mut *mut dyn IEnumUnknown);
+        assert!(hr >= 0, "should create runtimes enum");
+        let mut unk: *mut c_void = ptr::null_mut();
+        let ienum = ComPtr::<dyn IEnumUnknown>::new(unk_enum as *mut _).upgrade();
+        hr = ienum.next(1, (&mut unk) as *mut _ as *mut *mut dyn IUnknown, ptr::null_mut());
+        assert!(hr >= 0, "should get next without errors");
+        let runtime = ComPtr::<dyn ICLRRuntimeInfo>::new(unk as *mut _).upgrade();
+        let mut buffer: [WCHAR; 256] = [0; 256];
+        let wstr = buffer.as_mut_ptr() as LPWSTR;
+        let mut bytes: DWORD = 256;
+        hr = runtime.get_version_string(wstr, &mut bytes);
+        assert!(hr >= 0, "should get runtime version string");
+        let version_string  = 
+            U16String::from_ptr(wstr, (bytes-1) as usize).to_string_lossy();
+        println!("version: {}", version_string);
+    
+    }
+}
+
+#[test]
 pub fn clr_runtime_load_assembly() {
     init();
     CLR.with(|clr| {
         let _runtime_info = clr.runtime_info.borrow();
         let runtime_info = _runtime_info.as_ref().unwrap();
         let lib = r#"System.Net.Http.dll"#;
-        let result = runtime_info.load_library(lib);
+        let result = load_library(&runtime_info, lib);
         /*
         match result {
             Err(hr) => println!("hr=0x{:x}", hr),
@@ -237,10 +272,10 @@ pub fn should_not_find_assembly_ref() {
         let metadata_assembly_import = md.metadata_assembly_import();
 
         let result = unwrap_or_fail(
-            enum_assembly_refs(&metadata_assembly_import,"System.Net.Http"),
+            enum_assembly_refs(&metadata_assembly_import,"System.IO.Compression"),
             "should not return Error");
 
-        assert!(result.is_none(), "System.Net.Http.dll should NOT be referenced");
+        assert!(result.is_none(), "System.IO.Compression.dll should NOT be referenced");
     });
 }
 
@@ -368,12 +403,12 @@ pub fn should_find_type_ref() {
         
         let maybe_assembly_ref = unwrap_or_fail(enum_assembly_refs(
             &metadata_assembly_import, 
-            "mscorlib"),
+            "netstandard"),
             "should not return Error");
         
         let assembly_ref: mdAssemblyRef = unwrap_or_fail_opt(
             maybe_assembly_ref, 
-            "should find mscorlib ref");
+            "should find netstandard ref");
         
         let maybe_type_info = unwrap_or_fail(
             find_type_ref_info(

@@ -2,7 +2,7 @@ use com::sys::HRESULT;
 use ctor;
 
 #[cfg(test)]
-// #[ctor::ctor]
+#[ctor::ctor]
 fn init_log_for_tests() {
     let _ = env_logger::builder()
         .format_timestamp(None)

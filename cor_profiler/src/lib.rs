@@ -13,7 +13,6 @@ pub(crate) mod data_container;
 pub(crate) mod sig_parser;
 pub(crate) mod hooks_loader;
 pub(crate) mod utils;
-pub(crate) mod safe_array;
 mod tests;
 
 use cor_profiler::{

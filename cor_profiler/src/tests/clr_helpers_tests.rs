@@ -1,5 +1,8 @@
 use crate::cor_helpers::{
-    ICLRMetaHost
+    create_clr_metahost,
+    get_latest_installed_runtime,
+    get_clr_runtime_version_string,
+    get_metadata_dispenser
 };
 
 use crate::types::{
@@ -37,18 +40,18 @@ use crate::tests::common::*;
 
 #[test]
 fn test_create_clr_metahost() {
-    unwrap_or_fail(ICLRMetaHost::create(), "Couldn't create ICLRMetaHost");
+    unwrap_or_fail(create_clr_metahost(), "Couldn't create CLRMetaHost");
 }
 
 #[test]
 fn test_clr_get_latest_installed_runtime() {
     let metahost = unwrap_or_fail(
-        ICLRMetaHost::create(), 
-        "Couldn't create ICLRMetaHost"
+        create_clr_metahost(), 
+        "Couldn't create CLRMetaHost"
     );
 
     let _ = unwrap_or_fail(
-        metahost.get_latest_installed_runtime(), 
+        get_latest_installed_runtime(&metahost), 
         "Couldn't get latest installed runtime"
     );
 }
@@ -56,17 +59,17 @@ fn test_clr_get_latest_installed_runtime() {
 #[test]
 fn test_clr_runtime_get_metadata_dispenser() {
     let metahost = unwrap_or_fail(
-        ICLRMetaHost::create(), 
-        "Couldn't create ICLRMetaHost"
+        create_clr_metahost(), 
+        "Couldn't create CLRMetaHost"
     );
 
     let runtime = unwrap_or_fail(
-        metahost.get_latest_installed_runtime(), 
+        get_latest_installed_runtime(&metahost), 
         "Couldn't get latest installed runtime"
     );
 
     unwrap_or_fail(
-        runtime.get_metadata_dispenser(),
+        get_metadata_dispenser(&runtime),
         "Couldn't get metadata dispenser"
     );
 }
@@ -74,17 +77,17 @@ fn test_clr_runtime_get_metadata_dispenser() {
 #[test]
 fn test_clr_metadata_dispenser_open_scope() {
     let metahost = unwrap_or_fail(
-        ICLRMetaHost::create(), 
-        "Couldn't create ICLRMetaHost"
+        create_clr_metahost(), 
+        "Couldn't create CLRMetaHost"
     );
 
     let runtime = unwrap_or_fail(
-        metahost.get_latest_installed_runtime(), 
+        get_latest_installed_runtime(&metahost), 
         "Couldn't get latest installed runtime"
     );
 
     let runtime_version = unwrap_or_fail(
-        runtime.get_version_string(), 
+        get_clr_runtime_version_string(&runtime), 
         "Couldn't get runtime version string"
     );
 
@@ -92,8 +95,10 @@ fn test_clr_metadata_dispenser_open_scope() {
             + &runtime_version 
             + r#"\System.Net.Http.dll"#;
     
+    println!("{}", scope);
+    
     let metadata_dispenser = unwrap_or_fail(
-        runtime.get_metadata_dispenser(),
+        get_metadata_dispenser(&runtime),
         "Couldn't get metadata dispenser"
     );
 
