@@ -19,7 +19,6 @@ use crate::interfaces::{
     IMetaDataDispenser,
     IMetaDataImport,
     IMetaDataImport2,
-    IMetaDataEmit,
     ICLRRuntimeHost,
     ICLRMetaHost,
     ICLRRuntimeInfo,
@@ -51,10 +50,8 @@ use crate::tests::common::{
 
 use com::{
     ComPtr,
-    ComInterface,
     ComRc,
-    interfaces::IUnknown,
-    sys::{HRESULT, S_OK}
+    interfaces::IUnknown
 };
 
 use std::sync::Once;

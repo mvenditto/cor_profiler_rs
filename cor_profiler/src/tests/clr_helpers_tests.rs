@@ -7,17 +7,10 @@ use crate::cor_helpers::{
 
 use crate::types::{
     ofReadWriteMask,
-    mdToken
 };
 
 use crate::interfaces::{
-    IMetaDataDispenser,
-    IMetaDataImport2
-};
-
-use crate::metadata_helpers::{
-    get_type_info,
-    TypeInfo
+    IMetaDataDispenser
 };
 
 use std::{
@@ -27,16 +20,10 @@ use std::{
 
 use crate::guids::IID_IMetaDataImport2;
 use crate::utils::to_widestring;
-extern crate env_logger;
-
-use com::{
-    ComPtr,
-    ComRc,
-    interfaces::IUnknown,
-    sys::{HRESULT, S_OK}
-};
-
+use com::sys::S_OK;
 use crate::tests::common::*;
+
+extern crate env_logger;
 
 #[test]
 fn test_create_clr_metahost() {
