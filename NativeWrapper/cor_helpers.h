@@ -6,17 +6,8 @@
 extern "C" {
 
     typedef void* C_ICLRMetaHost;
-    typedef void* C_ICLRRuntimeInfo;
 
     __declspec(dllexport) C_ICLRMetaHost clr_create_meta_host(HRESULT* hr);
-    
-    __declspec(dllexport) C_ICLRRuntimeInfo  clr_get_latest_installed_runtime(C_ICLRMetaHost metahost, HRESULT* hr);
-
-    __declspec(dllexport) const wchar_t* clr_runtime_info_get_version_string(C_ICLRRuntimeInfo runtime_info, HRESULT* hr);
-
-    __declspec(dllexport) IMetaDataDispenser* clr_runtime_get_metadata_dispenser(C_ICLRRuntimeInfo runtime_info, HRESULT* hr);
-
-    __declspec(dllexport) HMODULE clr_runtime_load_library(C_ICLRRuntimeInfo runtime_info, LPCWSTR library_name, HRESULT* hr);
 
 	__declspec(dllexport) UINT cor_sig_compress_token(
         mdToken token, void* out_buffer);

@@ -1,11 +1,14 @@
 #![allow(non_camel_case_types)]
 #![allow(non_upper_case_globals)]
 #![allow(dead_code)]
-#[macro_use]
 
 use std::{slice, ffi::c_void, ptr};
-use num_derive::FromPrimitive;
-use num_derive::ToPrimitive; 
+
+use num_derive::{
+    FromPrimitive,
+    ToPrimitive
+};
+
 use crate::utils::to_widestring;
 
 use crate::types::{
@@ -14,22 +17,33 @@ use crate::types::{
     COR_SIGNATURE,
     ULONG,
     LPWSTR,
-    LPCWSTR,
     DWORD,
     WCHAR,
     HMODULE
 };
 
 extern crate widestring;
-use widestring::{U16CString, U16String};
+use widestring::U16String;
 
 use com::{
     ComPtr,
     ComRc,
-    sys::HRESULT
+    sys::HRESULT,
+    interfaces::IUnknown
 };
 
-use crate::interfaces::IMetaDataDispenser;
+use crate::interfaces::{
+    ICLRMetaHost,
+    ICLRRuntimeInfo,
+    IEnumUnknown,
+    IMetaDataDispenser
+};
+
+use crate::guids::{
+    CLSID_CorMetaDataDispenser,
+    IID_IMetaDataDispenser
+};
+
 
 #[macro_export]
 macro_rules! type_from_token {
@@ -109,7 +123,6 @@ impl CorSignature {
     }
 }
 
-#[macro_use]
 pub mod CorTypeAttr {
     use crate::types::DWORD;
 
@@ -260,14 +273,6 @@ pub(crate) struct CLRRuntimeInfo {
     native: C_ICLRRuntimeInfo
 }
 
-use crate::interfaces::{
-    ICLRMetaHost,
-    ICLRRuntimeInfo,
-    IEnumUnknown
-};
-
-use com::interfaces::IUnknown;
-
 pub fn create_clr_metahost() -> Result<ComRc<dyn ICLRMetaHost>, HRESULT> {
     unsafe {
         let mut hr: HRESULT = 0;
@@ -298,10 +303,6 @@ pub fn get_latest_installed_runtime(metahost: &ComRc<dyn ICLRMetaHost>) -> Resul
     }
 }
 
-use crate::guids::{
-    CLSID_CorMetaDataDispenser,
-    IID_IMetaDataDispenser
-};
 
 pub fn get_metadata_dispenser(runtime: &ComRc<dyn ICLRRuntimeInfo>) -> Result<ComRc<dyn IMetaDataDispenser>,HRESULT> {
     unsafe {
@@ -338,14 +339,6 @@ pub fn load_library(runtime: &ComRc<dyn ICLRRuntimeInfo>, library_name: &str) ->
 #[link(name = "Native", kind="static")]
 extern {
     pub fn clr_create_meta_host(hr: *mut HRESULT) -> C_ICLRMetaHost;
-
-    // pub fn clr_get_latest_installed_runtime(metahost: C_ICLRMetaHost, hr: *mut HRESULT) -> C_ICLRRuntimeInfo;
-
-    // pub fn clr_runtime_info_get_version_string(runtime_info: C_ICLRRuntimeInfo, hr: *mut HRESULT) -> LPCWSTR;
-
-    // pub fn clr_runtime_get_metadata_dispenser(runtime_info: C_ICLRRuntimeInfo, hr: *mut HRESULT) -> *mut c_void;
-
-    // pub fn clr_runtime_load_library(runtime_info: C_ICLRRuntimeInfo, library_name: LPCWSTR, hr: *mut HRESULT) -> HMODULE;
 
     pub fn cor_sig_compress_token(token: mdToken, out_buff: *mut c_void) -> ULONG;
 
