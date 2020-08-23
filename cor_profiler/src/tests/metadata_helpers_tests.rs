@@ -3,7 +3,8 @@ use crate::cor_helpers::{
     get_latest_installed_runtime,
     get_clr_runtime_version_string,
     get_metadata_dispenser,
-    load_library
+    load_library,
+    get_clr_runtime_host
 };
 
 use crate::types::{
@@ -158,10 +159,12 @@ fn setup() {
             panic!("failed to open {} metadata hr=0x{:x}",scope_path, hr);
         }
 
+        let runtime_host = get_clr_runtime_host(&runtime).unwrap();
+
         CLR.with(|clr|{
             clr.metahost.replace(Some(metahost));
             clr.runtime_info.replace(Some(runtime));
-            clr.runtime_host.replace(None)
+            clr.runtime_host.replace(Some(runtime_host))
         });
         
         let iunk = 

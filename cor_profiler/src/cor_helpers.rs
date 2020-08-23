@@ -35,13 +35,16 @@ use com::{
 use crate::interfaces::{
     ICLRMetaHost,
     ICLRRuntimeInfo,
+    ICLRRuntimeHost,
     IEnumUnknown,
     IMetaDataDispenser
 };
 
 use crate::guids::{
     CLSID_CorMetaDataDispenser,
-    IID_IMetaDataDispenser
+    IID_IMetaDataDispenser,
+    CLSID_CLRRuntimeHost,
+    IID_ICLRRuntimeHost
 };
 
 
@@ -310,6 +313,15 @@ pub fn get_metadata_dispenser(runtime: &ComRc<dyn ICLRRuntimeInfo>) -> Result<Co
         let hr = runtime.get_interface2(&CLSID_CorMetaDataDispenser, &IID_IMetaDataDispenser, &mut unk);
         if hr < 0 { return Err(hr); }
         Ok(ComPtr::<dyn IMetaDataDispenser>::new(unk as *mut _).upgrade())
+    }
+}
+
+pub fn get_clr_runtime_host(runtime: &ComRc<dyn ICLRRuntimeInfo>) -> Result<ComRc<dyn ICLRRuntimeHost>, HRESULT> {
+    unsafe {
+        let mut unk: *mut c_void = ptr::null_mut();
+        let hr = runtime.get_interface2(&CLSID_CLRRuntimeHost, &IID_ICLRRuntimeHost, &mut unk);
+        if hr < 0 { return Err(hr); }
+        Ok(ComPtr::<dyn ICLRRuntimeHost>::new(unk as *mut _).upgrade())
     }
 }
 
