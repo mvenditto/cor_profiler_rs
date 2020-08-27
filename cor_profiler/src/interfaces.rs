@@ -55,7 +55,11 @@ pub(crate) use i_meta_data_assembly_import::{
 };
 
 pub(crate) mod i_clr_runtime_host;
-pub(crate) use i_clr_runtime_host::ICLRRuntimeHost;
+pub(crate) use i_clr_runtime_host::{
+    ICLRRuntimeHost,
+    ICLRRuntimeHost2,
+    ICLRRuntimeHost4
+};
 
 pub(crate) mod i_clr_runtime_info;
 pub(crate) use i_clr_runtime_info::ICLRRuntimeInfo;
