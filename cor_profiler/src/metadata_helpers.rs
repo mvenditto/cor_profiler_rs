@@ -104,6 +104,11 @@ pub struct TypeInfo {
     pub parent_token: mdToken
 }
 
+pub struct AssemblyInfo {
+    pub metadata_token: mdToken,
+    pub assembly_name: String
+}
+
 impl fmt::Display for FunctionFullNameInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
         write!(f, r#"{}.{}.{}"#, self.module_name, self.class_name, self.function_name)
@@ -349,6 +354,97 @@ pub fn enum_type_refs(
 
 }
 
+pub fn get_assembly_refs_iter(metadata_assembly_import: &ComRc<dyn IMetaDataAssemblyImport>
+    ) -> impl std::iter::Iterator<Item = mdAssemblyRef> {
+    
+    const BuffSize: i32 = 1024;
+    let mut assembly_refs_enum: HCORENUM = ptr::null_mut() as *mut c_void;
+    let mut assembly_buff: Vec<mdAssemblyRef> = vec![mdTokenNil, BuffSize];
+    let mut num_tokens: ULONG = 0;
+    let mut hr: HRESULT = S_OK;
+    let data_ptr: *mut mdAssemblyRef = assembly_buff.as_mut_ptr();
+    let mut tot_items = 0;
+
+    let mut i = 0;
+    let mut chunk = 1;
+
+    unsafe {
+        loop {
+            hr = metadata_assembly_import.enum_assembly_refs(
+                &mut assembly_refs_enum,
+                data_ptr.offset((BuffSize * i) as isize),
+                BuffSize as ULONG,
+                &mut num_tokens
+            );
+
+            if is_fail!(hr) || hr == S_FALSE {
+                break 
+            }
+
+            tot_items += num_tokens;
+            
+            if num_tokens == BuffSize as u32 {
+                assembly_buff.resize(
+                    (chunk * BuffSize) as usize, mdTokenNil);
+            }
+
+            i += 1;
+            chunk += 1;
+        }
+    }
+
+    let mut iter_idx: usize = 0;
+
+    std::iter::from_fn(move || {
+        if iter_idx < (tot_items as usize) {
+            let result = assembly_buff[iter_idx];
+            iter_idx += 1;
+            if result == mdTokenNil {
+                return None;
+            } else {
+                return Some(result as mdAssemblyRef);
+            }
+        }
+        return None;
+    })
+}
+
+pub fn get_assembly_info(
+    metadata_assembly_import: &ComRc<dyn IMetaDataAssemblyImport>,
+    assembly_token: mdAssemblyRef
+) -> Result<AssemblyInfo, HRESULT> {
+    unsafe {
+        let mut assembly_name_buffer: [WCHAR; 256] = [0; 256];
+        let mut num_chars: ULONG = 0;
+        let hr = metadata_assembly_import.get_assembly_ref_props(
+            assembly_token,
+            ptr::null_mut(),
+            ptr::null_mut(),
+            assembly_name_buffer.as_mut_ptr() as LPWSTR,
+            256,
+            &mut num_chars,
+            ptr::null_mut(),
+            ptr::null_mut(),
+            ptr::null_mut(),
+            ptr::null_mut()
+        );
+
+        if is_fail!(hr) {
+            warn!("hr=0x{:x}", hr);
+            return Err(hr);
+        }
+
+        let name = U16String::from_ptr(
+            assembly_name_buffer.as_mut_ptr() as LPWSTR, 
+            (num_chars - 1) as usize).to_string_lossy();
+
+        return Ok(AssemblyInfo {
+            metadata_token: assembly_token,
+            assembly_name: name
+        });
+    }
+}
+
 pub fn enum_assembly_refs(
     metadata_assembly_import: &ComRc<dyn IMetaDataAssemblyImport>,
     type_name: &str
@@ -376,7 +472,6 @@ pub fn enum_assembly_refs(
             }
 
             for i in 0..num_tokens {
-
                 hr = metadata_assembly_import.get_assembly_ref_props(
                     assembly_buff[i as usize],
                     ptr::null_mut(),

@@ -34,7 +34,9 @@ use crate::metadata_helpers::{
     enum_type_refs,
     find_type_def_info,
     find_type_ref_info,
-    define_assembly_reference
+    define_assembly_reference,
+    get_assembly_refs_iter,
+    get_assembly_info
 };
 
 use std::{
@@ -271,6 +273,19 @@ pub fn should_find_assembly_ref() {
             "should not return Error");
 
         assert!(result.is_some(), "netstandard.dll should be referenced");
+    });
+}
+
+#[test]
+pub fn test_get_assembly_refs_iter() {
+    init();
+    METADATA.with(|md|{
+
+        let metadata_assembly_import = md.metadata_assembly_import();
+        for assembly_ref in get_assembly_refs_iter(&metadata_assembly_import) {
+            let name = get_assembly_info(&metadata_assembly_import, assembly_ref).unwrap().assembly_name;
+            info!("name: {}", name);
+        }
     });
 }
 
